@@ -9,7 +9,7 @@
  * modify it under the terms of the GNU Lesser General Public License
  * version 2.1 as published by the Free Software Foundation.
  *
- * This library is distributed in the hope that it will be useful, but
+ * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
@@ -23,6 +23,7 @@
 
 /* ------------------------------------------------------------------------- */
 /* INCLUDE FILES */
+#include "hat_drv.h"
 #include "u3.h"
 #include <unistd.h>
 #include <string.h>
@@ -121,20 +122,16 @@ int main(int argc, char **argv)
     if (argc > 1) {
         for (i = 1; i < argc; i++) {
             if (!strcmp(argv[i],"-ai0")) {
-                //strcat(chan, "Dev1/ai0,");
-                ch_table[NumChannels++] = 0;
+                ch_table[NumChannels++] = AI0;
             }
             else if (!strcmp(argv[i],"-ai1")) {
-                //strcat(chan, "Dev1/ai1,");
-                ch_table[NumChannels++] = 1;
+                ch_table[NumChannels++] = AI1;
             }
             else if (!strcmp(argv[i],"-ai2")) {
-                //strcat(chan, "Dev1/ai2,");
-                ch_table[NumChannels++] = 2;
+                ch_table[NumChannels++] = AI2;
             }
             else if (!strcmp(argv[i],"-ai3")) {
-                //strcat(chan, "Dev1/ai3,");
-                ch_table[NumChannels++] = 3;
+                ch_table[NumChannels++] = AI3;
             }
             else if (!strcmp(argv[i],"-sr") && (argc >= i)) {
                 char *endptr;
@@ -272,10 +269,10 @@ int streamData(HANDLE hDevice, struct shmem *shmem, u3CalibrationInfo *caliInfo,
         goto error;
     
     // Iinit buffer
-    init_buf(&shmem->ch_data[0]);
-    init_buf(&shmem->ch_data[1]);
-    init_buf(&shmem->ch_data[2]);
-    init_buf(&shmem->ch_data[3]);
+    initBuf(&shmem->ch_data[0]);
+    initBuf(&shmem->ch_data[1]);
+    initBuf(&shmem->ch_data[2]);
+    initBuf(&shmem->ch_data[3]);
     
     while(!exit_flag && !streamRead(hDevice, sem, shmem, caliInfo, data, samplesRead)) {
         for (i = 0; i < samplesRead; i++) {
@@ -285,7 +282,7 @@ int streamData(HANDLE hDevice, struct shmem *shmem, u3CalibrationInfo *caliInfo,
                 dvolt = 0xffff;
             }
             sem_wait(sem);
-            if (add_to_buf(&shmem->ch_data[i % NumChannels],(int)(dvolt)) < 0) {
+            if (addToBuf(&shmem->ch_data[i % NumChannels],(int)(dvolt)) < 0) {
                 //printf("buf:err\n");
             }
             sem_post(sem);
@@ -328,7 +325,7 @@ int updateIO(HANDLE hDevice, sem_t *sem, struct shmem *shmem)
         if((error = maskDO(hDevice, 0xffffff,shmem->ioctrl.iostate)) != 0) {
             PRINTERR("Error setting IO: %d\n",(int)error);
         }
-        PRINTOUT("IO set %X\n",shmem->ioctrl.iostate);
+        //PRINTOUT("IO set %X\n",shmem->ioctrl.iostate);
         shmem->ch_data[0].io_state = (shmem->ioctrl.iostate & (1 << AN0_IO)) >> 8;
         shmem->ch_data[1].io_state = (shmem->ioctrl.iostate & (1 << AN1_IO)) >> 9;
         shmem->ch_data[2].io_state = (shmem->ioctrl.iostate & (1 << AN2_IO)) >> 10;
@@ -356,7 +353,6 @@ long maskDO(HANDLE Handle, long wmask, long smask)
     sendDataBuff[4] = (smask & 0xff);               //IONumber 0-7
     sendDataBuff[5] = (smask & (0xff << 8)) >> 8;     //IONumber 8-15
     sendDataBuff[6] = (smask & (0xff << 16)) >> 16;   //IONumber 16-23
-    //printf("%X,%X\n",wmask,smask);
 
     if(ehFeedback(Handle, sendDataBuff, 7, &Errorcode, &ErrorFrame, NULL, 0) < 0)
         return -1;
@@ -385,7 +381,8 @@ int configIO(HANDLE hDevice)
                     //                    TimerCounterPinOffset to 4 (bits 4-7)
     sendBuff[9] = 0;  //DAC1Enable
 
-    sendBuff[10] = 0x0f;   //FIOAnalog : setting all FIOs as analog inputs
+    //FIOAnalog : setting all FIOs as analog inputs
+    sendBuff[10] = (1 << AI0) | (1 << AI1) | (1 << AI2) | (1 << AI3); 
     sendBuff[11] = 0x00;   //EIOAnalog : setting all EIOs as analog inputs
     extendedChecksum(sendBuff, 12);
 
@@ -446,7 +443,7 @@ int configIO(HANDLE hDevice)
         return -1;
     }
 
-    if( recBuff[10] != 255 && recBuff[10] != (uint8)(0x0f))
+    if( recBuff[10] != 255 && recBuff[10] != (uint8)((1 << AI0) | (1 << AI1) | (1 << AI2) | (1 << AI3)))
     {
         PRINTERR("ConfigIO error : FIOAnalog did not set get correctly\n");
         return -1;
@@ -498,7 +495,6 @@ int streamConfig(HANDLE hDevice)
 
     for(i = 0; i < NumChannels; i++)
     {
-        printf("%d\n",NumChannels);
         sendBuff[12 + i*2] = ch_table[i];  //PChannel = i
         sendBuff[13 + i*2] = 30; //NChannel = 31: Single Ended
     }

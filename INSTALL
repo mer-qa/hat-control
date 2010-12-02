@@ -1,0 +1,82 @@
+OF-HAT SW Installation Intructions
+**********************************
+
+These instuctions work in Ubuntu 10.04 distribution.
+
+HAT SW dependences:
+
+* libusb-1.0.8
+* liblabjackusb
+
+Libusb installation:
+
+1. Download libusb-1.0.8 sources here: 
+   http://sourceforge.net/projects/libusb/files/libusb-1.0/libusb-1.0.8/
+
+2. Extract package 
+
+   $ tar -xvf libusb-1.0.8.tar.bz2
+ 
+3. Read INSTALL to compile and install package or just
+
+   $ ./configure
+   $ make
+   $ sudo make install
+
+
+Liblabjackusb installation:
+
+1. Download exodriver from here: https://github.com/labjack/exodriver
+
+2. Extract exodriver 
+
+   $ tar -zxvf labjack-exodriver-98cf1f8.tar.gz
+
+3. Go liblabjackusb folder 
+
+   $ cd labjack-exodriver-98cf1f8/liblabjackusb/
+
+4. Build library 
+
+   $ make
+
+5. Install library
+
+   $ sudo make install
+
+6. Liblabjackusb needs access to the /dev/bus/usb. Run following commands in
+   labjack-exodriver root folder.
+
+   $ cd ..
+   $ sudo cp 10-labjack.rules /etc/udev/rules.d
+   $ sudo udevadm control --reload-rules
+   
+Building HAT SW
+
+   1. Build HAT SW
+
+   $ make
+
+Using HAT SW to control usb and power switches.
+
+   1. Connect HAT device to USB port and start HAT driver.
+   
+   $ cd src 
+
+   $ hat_drv &
+
+   Driver should print 'hat_drv: HAT driver started succesfully', if it has started succesfully.
+   
+   2. Use hat_ctrl SW to control HAT device. For example switch power output 1 on
+
+   $ hat_ctrl -pwr1=on
+
+   Get all parameters just type
+
+   $ hat_ctrl
+
+Using HAT SW and different sensors
+
+   TBD...
+
+

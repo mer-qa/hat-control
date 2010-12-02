@@ -33,26 +33,6 @@
 // Data buffer size for each channel in shared memory
 #define BUF_SIZE 1000
 
-// Sensor types
-#define NONE            0
-#define VOLTAGE         1
-#define CURRENT         2
-#define LIGHT           3
-#define ACCELERATION    4
-#define TEMPERATURE     5
-
-// Digital IO lines
-#define AN0_IO          8
-#define AN1_IO          9
-#define AN2_IO          10
-#define AN3_IO          11 
-#define USB_DATA_1      12
-#define USB_DATA_2      13
-#define USB_PWR_1       14
-#define USB_PWR_2       15
-#define DC_POWER_SHDN1  16
-#define DC_POWER_SHDN2  17
-
 struct rbuf {
     unsigned int buf[BUF_SIZE];
     unsigned int start;
@@ -83,10 +63,10 @@ int deAllocSharedMem(struct shmem *shmem);
 int deAllocAndFreeSharedMem(struct shmem *shmem, int seg_id);
 int allocSharedMem(struct shmem **shmem, int *segment_id);
 
-void init_buf(struct rbuf *rbuf);
-int get_buf_size(struct rbuf *buf);
-int add_to_buf(struct rbuf *buf, unsigned int value);
-int get_from_buf(struct rbuf *buf, unsigned int *value);
+void initBuf(struct rbuf *rbuf);
+int getbufSize(struct rbuf *buf);
+int addToBuf(struct rbuf *buf, unsigned int value);
+int getFromBuf(struct rbuf *buf, unsigned int *value);
 
 #endif
 

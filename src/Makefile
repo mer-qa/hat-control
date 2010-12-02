@@ -1,6 +1,6 @@
 nilibs=-lnidaqmxbase 
 ljlibs=-lm -llabjackusb
-includes=-I/usr/local/natinst/nidaqmxbase/include -I/usr/include/glib-2.0 -I/usr/lib/glib-2.0/include
+includes=
 flags= -O2 -Wall -g
 cc=gcc
 
@@ -22,4 +22,4 @@ hat_ctrl: hat_ctrl.c shmemlib.o
 	$(cc) $(includes) $(flags) hat_ctrl.c shmemlib.o $(ljlibs) -o hat_ctrl
 
 clean:
-	rm -f $(exes) $(libs)
+	rm -f $(exes) $(libs) *.gch

@@ -9,7 +9,7 @@
  * modify it under the terms of the GNU Lesser General Public License
  * version 2.1 as published by the Free Software Foundation.
  *
- * This library is distributed in the hope that it will be useful, but
+ * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
@@ -33,6 +33,7 @@
 #include <signal.h>
 #include <sys/shm.h>
 #include "shmemlib.h"
+#include "hat_drv.h"
 
 /* ------------------------------------------------------------------------- */
 /* EXTERNAL FUNCTION PROTOTYPES */
@@ -51,6 +52,7 @@
 /* MACROS */
 #define APP_NAME "hat_ctrl"
 #define PRINTOUT(...) printf(APP_NAME ": " __VA_ARGS__)
+#define PRINTOUT2(...) printf(__VA_ARGS__)
 #define PRINTERR(...) fprintf(stderr, APP_NAME ": " __VA_ARGS__)
 
 /* LOCAL GLOBAL VARIABLES */
@@ -133,27 +135,27 @@ int setDigitalIOMask(struct shmem *shmem, long io_mask)
 int convert_and_print(struct shmem *shmem, int mode, unsigned int value, int ch)
 {
     if (value == 0xffff) {
-        PRINTOUT("Over!  ");
+        PRINTOUT2("Over!  ");
     }
     else {
         switch(mode) {
         case 0:
-            PRINTOUT("%d  ",value);
+            PRINTOUT2("%d  ",value);
             break;
         case 1:
             if (shmem->ch_data[ch].io_state == 1) {
-                PRINTOUT("%4.1f  ",(double)(value)*0.392);
+                PRINTOUT2("%4.1f  ",(double)(value)*0.392);
             }
             else {
-                PRINTOUT("%4.2f  ",(double)(value)*0.030);
+                PRINTOUT2("%4.2f  ",(double)(value)*0.030);
             }
             break;
         case 2:
             if (shmem->ch_data[ch].io_state == 1) {
-                PRINTOUT("%1.2f  ",(double)(value)*0.392/1000);
+                PRINTOUT2("%1.2f  ",(double)(value)*0.392/1000);
             }
             else {
-                PRINTOUT("%1.2f  ",(double)(value)*0.030/1000);
+                PRINTOUT2("%1.2f  ",(double)(value)*0.030/1000);
             }
             break;
         }
@@ -189,7 +191,7 @@ int main(int argc, char **argv)
                 bit = strtoul(argv[i]+2 ,&endptr, 10);
                 if (endptr[0] == ':') {
                     state = strtoul(endptr+1 ,&endptr, 10);
-                    PRINTOUT("%d:%d\n",(int)bit, (int)state);
+                    PRINTOUT2("%d:%d\n",(int)bit, (int)state);
                 }                
             }
             else if (!strncmp(argv[i], "-i", 2)) {
@@ -227,7 +229,7 @@ int main(int argc, char **argv)
     }
 
     if (!ok_param) {
-        PRINTOUT("%s",usage);
+        PRINTOUT2("%s",usage);
         return -1;
     }
 
@@ -249,22 +251,22 @@ int main(int argc, char **argv)
         setDigitalIOMask(shmem, io_mask);
     }
     else {
-        init_buf(&shmem->ch_data[0]);
-        init_buf(&shmem->ch_data[1]);
-        init_buf(&shmem->ch_data[2]);
-        init_buf(&shmem->ch_data[3]);
+        initBuf(&shmem->ch_data[0]);
+        initBuf(&shmem->ch_data[1]);
+        initBuf(&shmem->ch_data[2]);
+        initBuf(&shmem->ch_data[3]);
 
         while (!prog_exit) {
             i = 0;
             for (ch = 0; ch < ch_count; ch++) {
                 sem_wait(sem);
-                ret = get_from_buf(&shmem->ch_data[chs[ch].num], &x);
+                ret = getFromBuf(&shmem->ch_data[chs[ch].num], &x);
                 sem_post(sem);
                 i = 0;
                 while (ret == 0) {
                     data[ch][i++] = x;
                     sem_wait(sem);
-                    ret = get_from_buf(&shmem->ch_data[chs[ch].num], &x);
+                    ret = getFromBuf(&shmem->ch_data[chs[ch].num], &x);
                     sem_post(sem);
                 }
             }
@@ -273,7 +275,7 @@ int main(int argc, char **argv)
                 for (ch = 0; ch < ch_count; ch++) {
                     convert_and_print(shmem, chs[ch].mode, data[ch][k], ch);
                 }
-                PRINTOUT("\n");
+                PRINTOUT2("\n");
             }
         }
     }

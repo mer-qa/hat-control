@@ -56,13 +56,13 @@
 /* ------------------------------------------------------------------------- */
 /* ==================== LOCAL FUNCTIONS ==================================== */
 /* ------------------------------------------------------------------------- */
-void init_buf(struct rbuf *rbuf)
+void initBuf(struct rbuf *rbuf)
 {
     rbuf->start = 0;
     rbuf->end = 0;
 }
 
-int get_buf_size(struct rbuf *buf)
+int getBufSize(struct rbuf *buf)
 {
     if (buf->end >= buf->start) {
         return (buf->end - buf->start);
@@ -72,9 +72,9 @@ int get_buf_size(struct rbuf *buf)
     }
 }
 
-int add_to_buf(struct rbuf *buf, unsigned int value)
+int addToBuf(struct rbuf *buf, unsigned int value)
 {
-    if (get_buf_size(buf) >= BUF_SIZE-1) {
+    if (getBufSize(buf) >= BUF_SIZE-1) {
         return -1;
     }
     buf->buf[buf->end++] = value;
@@ -84,9 +84,9 @@ int add_to_buf(struct rbuf *buf, unsigned int value)
     return 0;
 }
 
-int get_from_buf(struct rbuf *buf, unsigned int *value)
+int getFromBuf(struct rbuf *buf, unsigned int *value)
 {
-    if (get_buf_size(buf) == 0) {
+    if (getBufSize(buf) == 0) {
         return -1;
     }
     *value = buf->buf[buf->start++];
