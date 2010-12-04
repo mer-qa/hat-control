@@ -10,50 +10,40 @@ HAT SW dependences:
 
 Libusb installation:
 
-1. Download libusb-1.0.8 sources here: 
-   http://sourceforge.net/projects/libusb/files/libusb-1.0/libusb-1.0.8/
+1. Install libusb-1.0.x package:
 
-2. Extract package 
-
-   $ tar -xvf libusb-1.0.8.tar.bz2
- 
-3. Read INSTALL to compile and install package or just
-
-   $ ./configure
-   $ make
-   $ sudo make install
+   sudo apt-get install libusb-1.0
 
 
 Liblabjackusb installation:
 
-1. Download exodriver from here: https://github.com/labjack/exodriver
+1. Get exodriver sources:
 
-2. Extract exodriver 
+   git clone https://github.com/labjack/exodriver.git
 
-   $ tar -zxvf labjack-exodriver-98cf1f8.tar.gz
+2. Go liblabjackusb folder 
 
-3. Go liblabjackusb folder 
+   $ cd exodriver/liblabjackusb
 
-   $ cd labjack-exodriver-98cf1f8/liblabjackusb/
-
-4. Build library 
+3. Build library 
 
    $ make
 
-5. Install library
+4. Install library
 
    $ sudo make install
 
-6. Liblabjackusb needs access to the /dev/bus/usb. Run following commands in
+5. Liblabjackusb needs access to the /dev/bus/usb. Run following commands in
    labjack-exodriver root folder.
 
    $ cd ..
    $ sudo cp 10-labjack.rules /etc/udev/rules.d
    $ sudo udevadm control --reload-rules
-   
+ 
+  
 Building HAT SW
 
-   1. Build HAT SW
+   1. CD to the hat src folder and build HAT SW:
 
    $ make
 
@@ -61,8 +51,6 @@ Using HAT SW to control usb and power switches.
 
    1. Connect HAT device to USB port and start HAT driver.
    
-   $ cd src 
-
    $ hat_drv &
 
    Driver should print 'hat_drv: HAT driver started succesfully', if it has started succesfully.
