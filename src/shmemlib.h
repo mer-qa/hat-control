@@ -24,11 +24,14 @@
 #define SHMEMLIBH
 
 #include <sys/types.h>
+#include <stdio.h>
 
 // Shared memory properties
 #define SH_MEM_ID   0xaa
 #define SH_MEM_SEG_SIZE 0x6400
 #define SHMEMNAME "HATSHMEM"
+#define COMMSEM   "HATSHCOMM"
+
 
 // Data buffer size for each channel in shared memory
 #define BUF_SIZE 1000
@@ -38,24 +41,46 @@ struct rbuf {
     unsigned int start;
     unsigned int end;
     int overfull;
-    int io_state;
 };
 
 struct ioctrl {
     unsigned int iostate;
-    unsigned int changeIO;
 };
 
 struct sensor {
     unsigned int type;
     unsigned int offset_mv;
     unsigned int mult_mv;
+    int io_state;
 };
+
+struct streamConfig {
+    unsigned int sensors;
+    struct sensor sensor[4];
+    unsigned int samplerate;
+    char pathFilename[255];
+    unsigned long samples;
+    pid_t hat_ctrl_pid;
+};
+
+struct streamSetup {
+    unsigned int samplerate;
+    unsigned int numberOfChannels;
+    unsigned int samplesPerPacket;
+    unsigned int readSizeMultiplier;
+    unsigned int readSamples;
+    unsigned long samples;
+    FILE *fhandle;
+};
+
 struct shmem {
     struct rbuf ch_data[4];
     pid_t hat_drv_pid;
+    pid_t hat_ctrl_pid;
+    int retValToCtrl;
     struct ioctrl ioctrl;
-    struct sensor sensor[4];
+    unsigned int cmd;
+    struct streamConfig streamConfig;
 };
 
 int getShareMem(struct shmem **shmem, int *segment_id);
@@ -64,9 +89,9 @@ int deAllocAndFreeSharedMem(struct shmem *shmem, int seg_id);
 int allocSharedMem(struct shmem **shmem, int *segment_id);
 
 void initBuf(struct rbuf *rbuf);
-int getbufSize(struct rbuf *buf);
-int addToBuf(struct rbuf *buf, unsigned int value);
-int getFromBuf(struct rbuf *buf, unsigned int *value);
+int getBufSize(struct rbuf *buf);
+int addToBuf(struct rbuf *buf, int value);
+int getFromBuf(struct rbuf *buf, int *value);
 
 #endif
 

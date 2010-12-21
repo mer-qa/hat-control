@@ -45,6 +45,7 @@ struct U3_CALIBRATION_INFORMATION {
     uint8 prodID;
     double hardwareVersion; //helps to determine which calibration calculations
                             //to use
+    unsigned long serialNumber; //Labjack serial number
     int highVoltage;        //indicates if the device is U3-HV
     double ccConstants[20];
     /*

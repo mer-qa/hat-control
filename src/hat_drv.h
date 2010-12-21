@@ -23,19 +23,34 @@
 #ifndef HATDRVH
 #define HATDRVH
 
+// Current sensor multipliers
+// R4 = 141k (47k x 3)
+#define LO_GAIN_MULT    0.60024 // R9 = 6k6 (2k2 x 3)
+#define HI_GAIN_MULT    0.04058 // R8 = 287k
+
+// Command for driver
+#define NONE            0
+#define CHANGE_IO       1
+#define START_STREAMING 2
+#define STOP_STREAMING  3
+
 // Sensor types
 #define NONE            0
 #define VOLTAGE         1
 #define CURRENT         2
-#define LIGHT           3
-#define ACCELERATION    4
-#define TEMPERATURE     5
+#define MAX_SENSOR      3
+//#define LIGHT           3
+//#define ACCELERATION    4
+//#define TEMPERATURE     5
+
+
 
 // Analog inputs
 #define AI0             0
 #define AI1             2
 #define AI2             4
 #define AI3             6
+const int ach[] = {AI0, AI1, AI2, AI3};
 
 // Digital IO lines
 #define AN0_IO          8
@@ -49,5 +64,7 @@
 #define DC_POWER_SHDN1  16
 #define DC_POWER_SHDN2  17
 
+#define PWR_USB_IOS     ((1 << USB_DATA_1) | (1 << USB_DATA_2) | (1 << USB_PWR_1) | (1 << USB_PWR_2) | (1 << DC_POWER_SHDN1) | (1 << DC_POWER_SHDN2))
+#define SENSOR_IOS      ((1 << AN0_IO) | (1 << AN1_IO) | (1 << AN2_IO) | (1 << AN3_IO))
 #endif
 

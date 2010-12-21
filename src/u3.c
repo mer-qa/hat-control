@@ -31,6 +31,7 @@ u3CalibrationInfo U3_CALIBRATION_INFO_DEFAULT = {
     3,
     1.31,
     0,
+    0,
     //Nominal Values
     {   0.000037231,
         0.0,
@@ -320,6 +321,7 @@ long getCalibrationInfo(HANDLE hDevice, u3CalibrationInfo *caliInfo)
         goto commandByteError;
 
     caliInfo->hardwareVersion = cU3RecBuffer[14] + cU3RecBuffer[13]/100.0;
+    caliInfo->serialNumber = (cU3RecBuffer[18] << 24) | (cU3RecBuffer[17] << 16) | (cU3RecBuffer[16] << 8) | (cU3RecBuffer[15] << 0);
     caliInfo->highVoltage = (((cU3RecBuffer[37]&18) == 18)?1:0);
 
     for(i = 0; i < 5; i++)
@@ -445,16 +447,11 @@ long getAinVoltCalibrated_hw130(u3CalibrationInfo *caliInfo, uint8 positiveChann
     if(isCalibrationInfoValid(caliInfo) == -1)
         return -1;
 
-    //if(caliInfo->hardwareVersion < 1.30)
-    //{
-    //    printf("getAinVoltCalibrated_hw130 error: cannot handle U3 hardware versions < 1.30 .  Please use getAinVoltCalibrated function.\n");
-    //    return -1;
-    //}
-
     if(negChannel <= 15 || negChannel == 30)
     {
-        if(caliInfo->highVoltage == 0 || (caliInfo->highVoltage == 1 && positiveChannel >= 4 && negChannel >= 4))
-            *analogVolt = caliInfo->ccConstants[2]*((double)bytesVolt) + caliInfo->ccConstants[3];
+        if(caliInfo->highVoltage == 0 || (caliInfo->highVoltage == 1 && positiveChannel >= 4 && negChannel >= 4)) {
+            *analogVolt = caliInfo->ccConstants[2]*((double)bytesVolt) + caliInfo->ccConstants[3]  + caliInfo->ccConstants[9];
+        } 
         else if(caliInfo->hardwareVersion >= 1.30 && caliInfo->highVoltage == 1)
         {
             printf("getAinVoltCalibrated_hw130 error: invalid negative channel for U3-HV.\n");

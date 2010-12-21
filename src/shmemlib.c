@@ -72,7 +72,7 @@ int getBufSize(struct rbuf *buf)
     }
 }
 
-int addToBuf(struct rbuf *buf, unsigned int value)
+int addToBuf(struct rbuf *buf, int value)
 {
     if (getBufSize(buf) >= BUF_SIZE-1) {
         return -1;
@@ -84,7 +84,7 @@ int addToBuf(struct rbuf *buf, unsigned int value)
     return 0;
 }
 
-int getFromBuf(struct rbuf *buf, unsigned int *value)
+int getFromBuf(struct rbuf *buf, int *value)
 {
     if (getBufSize(buf) == 0) {
         return -1;
