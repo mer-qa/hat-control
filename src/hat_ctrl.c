@@ -35,7 +35,8 @@
 #include "shmemlib.h"
 #include "hat_drv.h"
 
-#define ANS_WAIT_MS 1000
+#define ANS_TIME_OUT    1000    //ms
+#define DATA_TIME_OUT   800     //ms
 
 /* ------------------------------------------------------------------------- */
 /* EXTERNAL FUNCTION PROTOTYPES */
@@ -100,7 +101,7 @@ const char usage[] = {
                "  -stream [OPTION...]      Start streaming\n"
                "   Options for stream command:\n"
                "    -sr SAMLERATE            Streaming samplerate [3-10000]. Default 100Hz\n"
-               "    -sc SAMPLES              Sample count [1-2^32]. Default 10\n"
+               "    -sc SAMPLES              Sample count [0-2^32]. 0=continuous. Default 10\n"
                "    -s INPUT-TYPE            Sensor input and type [INPUT-TYPE]\n"
                "                             Types: 1 = None (voltage)\n"
                "                                    2 = Current\n"
@@ -170,7 +171,7 @@ int sendCmdToDrv(struct shmem *shmem, unsigned int cmd)
     shmem->cmd = cmd;
     kill(shmem->hat_drv_pid, SIGUSR1);
     starttime = getTickCount();
-    while (wait_ret && (starttime + ANS_WAIT_MS) > getTickCount());
+    while (wait_ret && (starttime + ANS_TIME_OUT) > getTickCount());
     if (wait_ret) {
         PRINTERR("Command replay time out error\n");
         ret = -1;
@@ -203,19 +204,18 @@ int setDigitalIOMask(struct shmem *shmem, long io_mask)
     return sendCmdToDrv(shmem, CHANGE_IO);;
 }
 
-int convert_and_print(struct streamConfig *streamConf, int value, int ch)
+int convert_and_print(struct shmem *shmem, int value, int ch)
 {
     if (value == 0xffff) {
         PRINTOUT2("Over!  ");
     }
     else {
-        //printf("ch:%d  %d",ch,streamConf->sensor[ch].type);
-        switch(streamConf->sensor[ch].type) {
+        switch(shmem->streamConfig.sensor[ch].type) {
         case VOLTAGE:
             PRINTOUT2("%d mV  ",value);
             break;
         case CURRENT:
-            if (streamConf->sensor[ch].io_state == 0) {
+            if (shmem->ioctrl.sensorDigOutput[ch] == 0) {
                 PRINTOUT2("%4.1f mA  ",(float)(value)*LO_GAIN_MULT);
             }
             else {
@@ -243,41 +243,27 @@ void showSwitchStatus(struct shmem *shmem)
 
 int readAndShowData(struct shmem *shmem)
 {
-    int sample_count = 0, i, k, x, ch, ret = 0;
-    int data[5][1000] = {{0},{0}};
+    int sample_count = 0, x = 0, ch, ret = 0, starttime;
 
-    while (1) {
-        i = 0;
+    do {
         for (ch = 0; ch < shmem->streamConfig.sensors; ch++) {
-            sem_wait(semshmem);
-            ret = getFromBuf(&shmem->ch_data[ch], &x);
-            sem_post(semshmem);
-            i = 0;
-            while (ret == 0) {
-                data[ch][i++] = x;
+            starttime = getTickCount();
+            do {
                 sem_wait(semshmem);
                 ret = getFromBuf(&shmem->ch_data[ch], &x);
                 sem_post(semshmem);
+                if ( (starttime + DATA_TIME_OUT) < getTickCount()) {
+                    ret = -1;
+                    prog_exit = 1;
+                }
             }
+            while ( ret < 0 && prog_exit == 0);
+            if (ret == 0) convert_and_print(shmem, x, ch);
         }
-         
-        for (k = 0; k < i; k++) {
-            sample_count++;
-            for (ch = 0; ch < shmem->streamConfig.sensors; ch++) {
-                convert_and_print(&shmem->streamConfig, data[ch][k], ch);
-            }
-            PRINTOUT2("\n");
-        }
-        sem_wait(semshmem);
-        for (ch = 0; ch < shmem->streamConfig.sensors; ch++) {
-            i += getBufSize(&shmem->ch_data[ch]);
-        }
-        sem_post(semshmem);
-        if (prog_exit || (shmem->streamConfig.samples != 0 && sample_count >= shmem->streamConfig.samples)) {
-            break;
-        }
-    }
-    return 0;
+        printf("\n");
+        sample_count++;
+    } while ( !(prog_exit || (shmem->streamConfig.samples != 0 && sample_count >= shmem->streamConfig.samples)) );
+    return ret;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -333,7 +319,11 @@ int main(int argc, char **argv)
         new_iostate = shmem->ioctrl.iostate;
 
         for (i = 1; i < argc; i++) {
-            if (!strcmp(argv[i],"-s") && argc > (i+1)) {
+            if (!strcmp(argv[i],"--serial")) {
+                PRINTOUT2("%lX\n",shmem->serialNumber);
+                break;
+            }
+            else if (!strcmp(argv[i],"-s") && argc > (i+1)) {
                 val = strtoul(argv[++i] ,&endptr, 10);
                 if (val > 4 || val < 1 ) {
                     param_error = 1;
@@ -367,7 +357,7 @@ int main(int argc, char **argv)
             }
             else if (!strcmp(argv[i], "-sc") && argc > (i+1)) {
                 val = strtoul(argv[++i] ,&endptr, 10);
-                if ( *endptr != '\0' || (val < 1) ) {
+                if ( *endptr != '\0' || (val < 0) ) {
                     param_error = 1;
                     break;
                 }
@@ -380,7 +370,7 @@ int main(int argc, char **argv)
                 //streamConfig.pathFilename[strlen(argv[i])] = '\0';
             }
             else if (!strcmp(argv[i], "-stream:0") && (argc == 2)) {
-                sendCmdToDrv(shmem,STOP_STREAMING);
+                ret = sendCmdToDrv(shmem,STOP_STREAMING);
                 goto exit;
             }
             else if (!strcmp(argv[i], "-stream")) {
@@ -518,10 +508,10 @@ int main(int argc, char **argv)
             shmem->streamConfig.hat_ctrl_pid = getpid();
             sem_post(semshmem);
         }
-        sendCmdToDrv(shmem, START_STREAMING);
+        ret = sendCmdToDrv(shmem, START_STREAMING);
     
         if ( streamConfig.pathFilename[0] == 0 ) {
-            ret = readAndShowData(shmem);
+            readAndShowData(shmem);
             sem_wait(semshmem);
             shmem->streamConfig.hat_ctrl_pid = 0;
             sem_post(semshmem);

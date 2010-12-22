@@ -28,6 +28,9 @@
 #define LO_GAIN_MULT    0.60024 // R9 = 6k6 (2k2 x 3)
 #define HI_GAIN_MULT    0.04058 // R8 = 287k
 
+// Maximun input voltge
+#define MAX_VALUE   2467
+
 // Command for driver
 #define NONE            0
 #define CHANGE_IO       1

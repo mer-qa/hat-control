@@ -55,7 +55,7 @@ int updateIO(HANDLE hdevice, sem_t *sem, struct shmem *shmem);
 long maskDO(HANDLE Handle, long wmask, long smask);
 int streamDataAndStore(HANDLE hDevice, struct streamSetup *streamSetup, struct shmem *shmem, 
                        u3CalibrationInfo *caliInfo, sem_t *sem, unsigned long *samples);
-int writeToFile(struct streamSetup *streamSetup, struct streamConfig *streamConf, int value, int ch);
+int writeToFile(struct shmem *shmem, struct streamSetup *streamSetup, int value, int ch);
 int handleStreamConfig(struct streamSetup *streamSetup, struct streamConfig *streamConfig);
 void sendRespToCtrl(struct shmem *shmem, int ret);
 
@@ -68,7 +68,7 @@ int packetCounter = 0;
 sem_t *semshmem;
 sem_t *semcomm;
 
-volatile sig_atomic_t exit_flag = 0, usr1_flag = 0;
+volatile sig_atomic_t exit_flag = 0, usr1_flag = 0, alrm_flag = 0;
 
 /* ------------------------------------------------------------------------- */
 /* ==================== LOCAL FUNCTIONS ==================================== */
@@ -81,6 +81,9 @@ void sig_usr1(int sig) {
  usr1_flag = 1;
 }
 
+void sig_alrm(int sig) {
+ alrm_flag = 1;
+}
 
 int main(int argc, char **argv)
 {
@@ -92,6 +95,7 @@ int main(int argc, char **argv)
 
     (void) signal(SIGINT, sig_int);
     (void) signal(SIGUSR1, sig_usr1);
+    (void) signal(SIGALRM, sig_alrm);
 
     memset(&streamSetup,0,sizeof(struct streamSetup));
 
@@ -105,11 +109,19 @@ int main(int argc, char **argv)
     // Block SIGUSR1 and SIGINT
     sigaddset(&blockMask, SIGUSR1);
     sigaddset(&blockMask, SIGINT);
+    sigaddset(&blockMask, SIGALRM);
     sigprocmask(SIG_SETMASK, &blockMask, NULL);
 
     // remove SIGUSR1 from mask to be used by sigsuspend 
     sigdelset(&sigsuMask, SIGUSR1); // form mask to unblock SIGUSR1 and SIGINT 
     sigdelset(&sigsuMask, SIGINT); // form mask to unblock SIGUSR1 and SIGINT 
+    sigdelset(&sigsuMask, SIGALRM); // form mask to unblock SIGUSR1 and SIGINT 
+    
+    struct itimerval val;
+    val.it_interval.tv_sec = 1;
+    val.it_interval.tv_usec = 0;
+    val.it_value = val.it_interval;
+    setitimer(ITIMER_REAL, &val, NULL);
 
     // Create semaphores for handling shared memory
     sem_unlink(SHMEMNAME);
@@ -146,6 +158,8 @@ int main(int argc, char **argv)
 
     PRINTOUT("HAT driver started succesfully\n");
     PRINTOUT("Driver uses device SN:%lX\n",caliInfo.serialNumber);
+    shmem->serialNumber = caliInfo.serialNumber;
+
     // Set all switches off state 
     shmem->cmd = CHANGE_IO;
     updateIO(hDevice, semshmem, shmem);
@@ -155,17 +169,29 @@ int main(int argc, char **argv)
 
     unsigned int cmd;
     unsigned long samples;
+    struct timespec timespec;
+    
+    timespec.tv_sec = 1;
+    timespec.tv_nsec = 0;
 
     while (!exit_flag) {
         // Block signals during flag check
         sigprocmask(SIG_BLOCK, &blockMask, NULL);
-        while (usr1_flag == 0 && exit_flag == 0 && dataStreaming == 0) {
+        while (usr1_flag == 0 && exit_flag == 0 && dataStreaming == 0 && alrm_flag == 0) {
             //printf("sleep\n");
             sigsuspend(&sigsuMask);
             //printf("wake\n");
         }
         // Unblock signals after flag check
         sigprocmask(SIG_UNBLOCK, &blockMask, NULL);
+        if (alrm_flag) {
+            alrm_flag = 0;
+            if (!dataStreaming && !usr1_flag) {
+                if (updateIO(hDevice, semshmem, shmem) != 0) {
+                    exit_flag = 1;
+                }
+            }
+        }
 
         if (usr1_flag) {
             usr1_flag = 0;
@@ -184,7 +210,6 @@ int main(int argc, char **argv)
             //Stopping any previous streams
             streamStop(hDevice);
             errno = 0;
-
             if (strcmp(shmem->streamConfig.pathFilename, "")) {
                 streamSetup.fhandle = fopen(shmem->streamConfig.pathFilename,"w");
                 if (streamSetup.fhandle == NULL) {
@@ -214,7 +239,7 @@ int main(int argc, char **argv)
     
                 dataStreaming = 1;
             }
-            sendRespToCtrl(shmem,1);
+            sendRespToCtrl(shmem,0);
         }
         else if (cmd == STOP_STREAMING) {
             if (streamSetup.fhandle != NULL) {
@@ -289,12 +314,12 @@ int handleStreamConfig(struct streamSetup *streamSetup, struct streamConfig *str
         streamSetup->readSamples = streamSetup->numberOfChannels;
     }
     else if (streamSetup->samplerate > 20 && streamSetup->samplerate <= 150) {
-        streamSetup->samplesPerPacket = 2;
-        streamSetup->readSamples = 2;
+        streamSetup->samplesPerPacket = streamSetup->numberOfChannels*2;
+        streamSetup->readSamples = streamSetup->numberOfChannels*2;
     }
     else if (streamSetup->samplerate > 150 && streamSetup->samplerate <= 500) {
-        streamSetup->samplesPerPacket = 5;
-        streamSetup->readSamples = 5;
+        streamSetup->samplesPerPacket = streamSetup->numberOfChannels*4;
+        streamSetup->readSamples = streamSetup->numberOfChannels*4;
     }
     else {   
         switch (streamSetup->numberOfChannels) {
@@ -328,28 +353,29 @@ int handleStreamConfig(struct streamSetup *streamSetup, struct streamConfig *str
     }
 }   
 
-int writeToFile(struct streamSetup *streamSetup, struct streamConfig *streamConf, int value, int ch)
+int writeToFile(struct shmem *shmem, struct streamSetup *streamSetup, int value, int ch)
 {
+    FILE *fhandle = streamSetup->fhandle;
     if (value == 0xffff) {
-       fprintf(streamSetup->fhandle,"Over!  ");
+       fprintf(fhandle,"Over!  ");
     }
     else {
-        switch(streamConf->sensor[ch].type) {
+        switch(shmem->streamConfig.sensor[ch].type) {
         case VOLTAGE:
-            fprintf(streamSetup->fhandle,"%d mV ",value);
+            fprintf(fhandle,"%d mV ",value);
             break;
         case CURRENT:
-            if (streamConf->sensor[ch].io_state == 0) {
-                fprintf(streamSetup->fhandle,"%4.1f mA ",(double)(value)*LO_GAIN_MULT);
+            if (shmem->ioctrl.sensorDigOutput[ch] == 0) {
+                fprintf(fhandle,"%4.1f mA ",(double)(value)*LO_GAIN_MULT);
             }
             else {
-                fprintf(streamSetup->fhandle,"%4.2f mA ",(double)(value)*HI_GAIN_MULT);
+                fprintf(fhandle,"%4.2f mA ",(double)(value)*HI_GAIN_MULT);
             }
             break;
         }
     }
     if (ch == (streamSetup->numberOfChannels-1) ) {
-        fprintf(streamSetup->fhandle, "\n");
+        fprintf(fhandle, "\n");
     }
     return 0;
 }
@@ -369,15 +395,16 @@ int streamDataAndStore(HANDLE hDevice, struct streamSetup *streamSetup, struct s
             }
             getAinVoltCalibrated_hw130(caliInfo, (i % streamSetup->numberOfChannels), 31, data[i], &(dvolt));
             dvolt = (dvolt*1000);
-            if (dvolt > 2467) {
+            if (dvolt > MAX_VALUE) {
                 dvolt = 0xffff;
             }
+
             sem_wait(sem);
-            if (addToBuf(&shmem->ch_data[i % streamSetup->numberOfChannels],(int)(dvolt)) < 0) {
+            if (addToBuf(&shmem->ch_data[i % streamSetup->numberOfChannels],(int)(nearbyint(dvolt))) < 0) {
                 //printf("buf:full\n");
             }
             if (streamSetup->fhandle != NULL) {
-                 writeToFile(streamSetup, &shmem->streamConfig, (int)(dvolt), i % streamSetup->numberOfChannels);
+                 writeToFile(shmem, streamSetup, (int)(dvolt), i % streamSetup->numberOfChannels);
             }
             sem_post(sem);
         }
@@ -392,16 +419,16 @@ int streamDataAndStore(HANDLE hDevice, struct streamSetup *streamSetup, struct s
 int updateIO(HANDLE hDevice, sem_t *sem, struct shmem *shmem)
 {
     long error;
-
     // USB_DATA switches are inverted
     if((error = maskDO(hDevice, 0xffffff,shmem->ioctrl.iostate ^ ((1 << USB_DATA_1) | (1 << USB_DATA_2)))) != 0) {
         PRINTERR("Error setting IO: %d\n",(int)error);
     }
-    shmem->streamConfig.sensor[0].io_state = (shmem->ioctrl.iostate & (1 << AN0_IO)) >> AN0_IO;
-    shmem->streamConfig.sensor[1].io_state = (shmem->ioctrl.iostate & (1 << AN1_IO)) >> AN1_IO;
-    shmem->streamConfig.sensor[2].io_state = (shmem->ioctrl.iostate & (1 << AN2_IO)) >> AN2_IO;
-    shmem->streamConfig.sensor[3].io_state = (shmem->ioctrl.iostate & (1 << AN3_IO)) >> AN3_IO;
-
+    else {
+        shmem->ioctrl.sensorDigOutput[0] = (shmem->ioctrl.iostate & (1 << AN0_IO)) >> AN0_IO;
+        shmem->ioctrl.sensorDigOutput[1] = (shmem->ioctrl.iostate & (1 << AN1_IO)) >> AN1_IO;
+        shmem->ioctrl.sensorDigOutput[2] = (shmem->ioctrl.iostate & (1 << AN2_IO)) >> AN2_IO;
+        shmem->ioctrl.sensorDigOutput[3] = (shmem->ioctrl.iostate & (1 << AN3_IO)) >> AN3_IO;
+    }
     return error;
 }
 

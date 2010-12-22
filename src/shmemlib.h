@@ -45,13 +45,13 @@ struct rbuf {
 
 struct ioctrl {
     unsigned int iostate;
+    unsigned int sensorDigOutput[4];
 };
 
 struct sensor {
     unsigned int type;
     unsigned int offset_mv;
     unsigned int mult_mv;
-    int io_state;
 };
 
 struct streamConfig {
@@ -81,6 +81,7 @@ struct shmem {
     struct ioctrl ioctrl;
     unsigned int cmd;
     struct streamConfig streamConfig;
+    unsigned long serialNumber;
 };
 
 int getShareMem(struct shmem **shmem, int *segment_id);
