@@ -25,8 +25,10 @@
 
 // Current sensor multipliers
 // R4 = 141k (47k x 3)
-#define LO_GAIN_MULT    0.60024 // R9 = 6k6 (2k2 x 3)
-#define HI_GAIN_MULT    0.04058 // R8 = 287k
+//#define LO_GAIN_MULT    0.60024 // R9 = 6k6 (2k2 x 3)
+//#define HI_GAIN_MULT    0.04058 // R8 = 287k
+#define LO_GAIN_MULT    0.615087 // V2 board: 140k, 6k49, 274k
+#define HI_GAIN_MULT    0.041962 // Trimmers at middle position (2.5k and 50ohm)
 
 // Maximun input voltge
 #define MAX_VALUE   2467
