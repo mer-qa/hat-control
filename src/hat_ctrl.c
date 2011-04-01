@@ -26,6 +26,7 @@
 /* INCLUDE FILES */
 #include "u3.h"
 #include <unistd.h>
+#include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <semaphore.h>
@@ -150,15 +151,6 @@ void ex_program(int sig) {
 
 void ret_received(int sig) {
  wait_ret = 0;
-}
-
-long getTickCount()
-{
-    struct timeval tv;
-
-    gettimeofday(&tv, NULL);
-
-    return (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
 }
 
 int sendCmdToDrv(struct shmem *shmem, unsigned int cmd)
