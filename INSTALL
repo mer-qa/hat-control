@@ -43,9 +43,15 @@ Liblabjackusb installation:
   
 Building HAT SW
 
-   1. CD to the hat src folder and build HAT SW:
+   1. Building requires autoconf, automake, libtool and pkg-config
+   2. In top level directory execute the following:
 
+   $ autoreconf -i
+   $ ./configure --prefix=/usr
    $ make
+   $ sudo make install
+
+   3. hat_drv and hat_ctrl have been installed in /usr/bin
 
 Using HAT SW to control usb and power switches.
 
@@ -67,4 +73,9 @@ Using HAT SW and different sensors
 
    TBD...
 
+Building a binary using hatcontrol library
 
+   1. Use e.g. #include <hatcontrol/shmemlib.h> in your code
+   2. Building example using pkg-config:
+
+   $ gcc -Wall $(pkg-config --libs --cflags libhatcontrol) myhatsw.c
