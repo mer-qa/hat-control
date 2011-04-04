@@ -85,6 +85,10 @@ void sig_alrm(int sig) {
  alrm_flag = 1;
 }
 
+void sig_term(int sig) {
+ exit_flag = 1;
+}
+
 int main(int argc, char **argv)
 {
     HANDLE hDevice;
@@ -96,6 +100,7 @@ int main(int argc, char **argv)
     (void) signal(SIGINT, sig_int);
     (void) signal(SIGUSR1, sig_usr1);
     (void) signal(SIGALRM, sig_alrm);
+    (void) signal(SIGTERM, sig_term);
 
     memset(&streamSetup,0,sizeof(struct streamSetup));
 
