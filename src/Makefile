@@ -1,5 +1,5 @@
 nilibs=-lnidaqmxbase 
-ljlibs=-lm -llabjackusb
+ljlibs=-lm -llabjackusb -lpthread
 includes=
 flags= -O2 -Wall -g
 cc=gcc
