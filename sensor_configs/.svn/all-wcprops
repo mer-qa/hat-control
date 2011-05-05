@@ -1,0 +1,47 @@
+K 25
+svn:wc:ra_dav:version-url
+V 93
+/svn/design/!svn/ver/5345/design/NOK1501_Zwang_sensor_interface/Software/trunk/sensor_configs
+END
+config_M_demo
+K 25
+svn:wc:ra_dav:version-url
+V 107
+/svn/design/!svn/ver/5415/design/NOK1501_Zwang_sensor_interface/Software/trunk/sensor_configs/config_M_demo
+END
+config1
+K 25
+svn:wc:ra_dav:version-url
+V 101
+/svn/design/!svn/ver/5345/design/NOK1501_Zwang_sensor_interface/Software/trunk/sensor_configs/config1
+END
+config2
+K 25
+svn:wc:ra_dav:version-url
+V 101
+/svn/design/!svn/ver/5345/design/NOK1501_Zwang_sensor_interface/Software/trunk/sensor_configs/config2
+END
+config_audio_demo
+K 25
+svn:wc:ra_dav:version-url
+V 111
+/svn/design/!svn/ver/5534/design/NOK1501_Zwang_sensor_interface/Software/trunk/sensor_configs/config_audio_demo
+END
+config_audiolat_demo
+K 25
+svn:wc:ra_dav:version-url
+V 114
+/svn/design/!svn/ver/5403/design/NOK1501_Zwang_sensor_interface/Software/trunk/sensor_configs/config_audiolat_demo
+END
+config_opt_demo
+K 25
+svn:wc:ra_dav:version-url
+V 109
+/svn/design/!svn/ver/5534/design/NOK1501_Zwang_sensor_interface/Software/trunk/sensor_configs/config_opt_demo
+END
+config_temp_demo
+K 25
+svn:wc:ra_dav:version-url
+V 110
+/svn/design/!svn/ver/5534/design/NOK1501_Zwang_sensor_interface/Software/trunk/sensor_configs/config_temp_demo
+END
