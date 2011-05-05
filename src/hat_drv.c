@@ -23,17 +23,19 @@
 
 /* ------------------------------------------------------------------------- */
 /* INCLUDE FILES */
-#include "hat_drv.h"
-#include "u3.h"
 #include <unistd.h>
 #include <string.h>
-#include "shmemlib.h"
 #include <signal.h>
 #include <semaphore.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <ctype.h>
+#include "shmemlib.h"
+#include "hat_ctrl_lib.h"
+#include "hat_drv.h"
+#include "u3.h"
 
 /* ------------------------------------------------------------------------- */
 /* MACROS */
@@ -58,6 +60,7 @@ int streamDataAndStore(HANDLE hDevice, struct streamSetup *streamSetup, struct s
 int writeToFile(struct shmem *shmem, struct streamSetup *streamSetup, int value, int ch);
 int handleStreamConfig(struct streamSetup *streamSetup, struct streamConfig *streamConfig);
 void sendRespToCtrl(struct shmem *shmem, int ret);
+int portDirWrite(HANDLE hDevice, long mask, long dir);
 
 /* ------------------------------------------------------------------------- */
 /* GLOBAL VARIABLES */
@@ -65,7 +68,7 @@ int ch_table[8] = {0};
 int autoRecoveryOn = 1;
 int packetCounter = 0;
 
-sem_t *semshmem;
+sem_t *semshmem, *tempsemshmem;
 sem_t *semcomm;
 
 volatile sig_atomic_t exit_flag = 0, usr1_flag = 0, alrm_flag = 0;
@@ -85,22 +88,45 @@ void sig_alrm(int sig) {
  alrm_flag = 1;
 }
 
-void sig_term(int sig) {
- exit_flag = 1;
-}
-
 int main(int argc, char **argv)
 {
     HANDLE hDevice;
     u3CalibrationInfo caliInfo;
     struct shmem *shmem = NULL; 
-    int ret = 0, sh_seq_id = 0, dataStreaming = 0;
+    int ret = 0, sh_seq_id = 0, dataStreaming = 0, i = 0;
+    char *SerialNumber = NULL;
+    char CharSerialNumber[MAX_LEN_NAME];
+    char tempSHMEMNAME[MAX_LEN_NAME];
+
     struct streamSetup streamSetup;
 
     (void) signal(SIGINT, sig_int);
+    (void) signal(SIGTERM, sig_int);
     (void) signal(SIGUSR1, sig_usr1);
     (void) signal(SIGALRM, sig_alrm);
-    (void) signal(SIGTERM, sig_term);
+
+    // Get SerialNumber
+    if (argc > 1) {
+        for (i = 1; i < argc; i++) {
+        	if (!strcmp(argv[i],"-sn") && (argc > (i+1))) {
+				SerialNumber = argv[++i];
+	        	//printf("%d, %s\n", i, SerialNumber);
+				break;
+        	}
+        }
+    }
+    // help if no -SN parameter used
+    if (SerialNumber == NULL) {
+    	PRINTOUT("Use \"-sn SERIALNUMBER\" to connect specific HAT device\n");
+    } else {
+    	 for( i = 0; SerialNumber[ i ]; i++)
+    		 SerialNumber[ i ] = toupper( SerialNumber[ i ] );
+    	 PRINTOUT("Connecting to SN: %s\n", SerialNumber);
+    }
+
+    getShName(SerialNumber, SHMEMNAME);
+    getShComm(SerialNumber, COMMSEM);
+    getShMemID(SerialNumber);
 
     memset(&streamSetup,0,sizeof(struct streamSetup));
 
@@ -115,12 +141,14 @@ int main(int argc, char **argv)
     sigaddset(&blockMask, SIGUSR1);
     sigaddset(&blockMask, SIGINT);
     sigaddset(&blockMask, SIGALRM);
+    sigaddset(&blockMask, SIGTERM);
     sigprocmask(SIG_SETMASK, &blockMask, NULL);
 
     // remove SIGUSR1 from mask to be used by sigsuspend 
-    sigdelset(&sigsuMask, SIGUSR1); // form mask to unblock SIGUSR1 and SIGINT 
-    sigdelset(&sigsuMask, SIGINT); // form mask to unblock SIGUSR1 and SIGINT 
-    sigdelset(&sigsuMask, SIGALRM); // form mask to unblock SIGUSR1 and SIGINT 
+    sigdelset(&sigsuMask, SIGUSR1); // form mask to unblock SIGUSR1 
+    sigdelset(&sigsuMask, SIGINT);  // form mask to unblock SIGINT 
+    sigdelset(&sigsuMask, SIGALRM); // form mask to unblock SIGALRM 
+    sigdelset(&sigsuMask, SIGTERM); // form mask to unblock SIGTERM 
     
     struct itimerval val;
     val.it_interval.tv_sec = 1;
@@ -129,34 +157,83 @@ int main(int argc, char **argv)
     setitimer(ITIMER_REAL, &val, NULL);
 
     // Create semaphores for handling shared memory
-    sem_unlink(SHMEMNAME);
-    semshmem = sem_open(SHMEMNAME, O_CREAT | O_EXCL, 0644, 1);
+    // Check if empty semaphore is in use.
+	if (SerialNumber != NULL) {
+	    getShName(NULL, tempSHMEMNAME);
+		tempsemshmem = sem_open(tempSHMEMNAME, O_CREAT | O_EXCL, 0644, 1);
+		if(tempsemshmem == SEM_FAILED) {
+			PRINTERR("SN: %s can't be connected. HAT driver without SN running \n", SerialNumber);
+			PRINTERR("If multiple HAT, remember to use -SN parameter\n");
+			goto done;
+		} else {
+			sem_unlink(tempSHMEMNAME);
+		}
+	}
+
+	//sem_unlink(SHMEMNAME);
+	semshmem = sem_open(SHMEMNAME, O_CREAT | O_EXCL, 0644, 1);
 
     if(semshmem == SEM_FAILED) {
-        PRINTERR("Unable to create semaphore (%d)\n",errno);
+        PRINTERR("Unable to create semaphore %s (%d)1\n",SHMEMNAME, errno);
+    	if (SerialNumber != NULL) {
+    		PRINTERR("HAT SN: %s already connected?\n",SerialNumber);
+    	}
         goto done;
     }
 
-    sem_unlink(COMMSEM);
+    //sem_unlink(COMMSEM);
     semcomm = sem_open(COMMSEM, O_CREAT | O_EXCL, 0644, 1);
 
     if(semcomm == SEM_FAILED) {
-        PRINTERR("Unable to create semaphore (%d)\n",errno);
+        PRINTERR("Unable to create semaphore %s(%d)2\n",COMMSEM, errno);
         goto done;
     }
 
     allocSharedMem(&shmem, &sh_seq_id);
     if (shmem == NULL) {
-        PRINTERR("Error to allocate shared mem\n");
+        PRINTERR("Error to allocate shared mem id:%d\n", SH_MEM_ID);
     }
     shmem->hat_drv_pid = getpid();
 
-    //Opening first found U3 over USB
-    if ( (hDevice = openUSBConnection(-1)) == NULL)
-        goto done;
+    //try to find right U3 if multiple devices
+    i = 1;
+    while (1) {
+        //Connecting to U3 over USB
+		if ( (hDevice = openUSBConnectionDev(i)) == NULL) {
+			PRINTERR("Could not connect to SN: %s\n", SerialNumber);
+			goto close;
+		}
+		//Get SN
+		if (getCalibrationInfo(hDevice, &caliInfo) < 0)
+			goto close;
 
-    if (getCalibrationInfo(hDevice, &caliInfo) < 0)
-        goto close;
+		//Hex serialNumber to string
+		sprintf(CharSerialNumber , "%lX", caliInfo.serialNumber);
+
+		// If empty -SN parameter, check that first U3 is not already connected
+		if (SerialNumber == NULL) {
+			getShName(CharSerialNumber, tempSHMEMNAME);
+			tempsemshmem = sem_open(tempSHMEMNAME, O_CREAT | O_EXCL, 0644, 1);
+			if(tempsemshmem == SEM_FAILED) {
+				PRINTERR("Can't use empty SN if HAT driver running\n");
+                sem_unlink(SHMEMNAME);
+                sem_unlink(COMMSEM);
+				goto done;
+			} else {
+				sem_unlink(tempSHMEMNAME);
+			}
+		}
+		// check if connected to right U3, or no SN given
+		if (SerialNumber == NULL || !strcasecmp(CharSerialNumber, SerialNumber)) {
+			break;
+		} else {
+			//Close connection and try next one
+			closeUSBConnection(hDevice);
+			i = i + 1;
+		}
+		if (i >= 100)
+			goto close;
+	}
     
     if (configIO(hDevice) != 0)
         goto close;
@@ -276,14 +353,15 @@ close:
         kill(shmem->streamConfig.hat_ctrl_pid, SIGINT); 
     if (shmem->hat_ctrl_pid != 0) 
         kill(shmem->hat_ctrl_pid, SIGINT); 
-    
-    closeUSBConnection(hDevice);
+    if (hDevice != NULL)
+    	closeUSBConnection(hDevice);
+
+    sem_unlink(SHMEMNAME);
+    sem_unlink(COMMSEM);
 
 done:
 
     deAllocAndFreeSharedMem(shmem, sh_seq_id);
-    sem_unlink(SHMEMNAME);
-    sem_unlink(COMMSEM);
     // restore the original mask
     sigprocmask(SIG_SETMASK, &oldMask, NULL);
     return 0;
@@ -299,7 +377,8 @@ void sendRespToCtrl(struct shmem *shmem, int ret)
 int handleStreamConfig(struct streamSetup *streamSetup, struct streamConfig *streamConfig)
 {
     int t = 0;
-
+    
+    streamSetup->start_ch = 0;
     // Count channels
     streamSetup->numberOfChannels = 0;
     for (t = 0; t < 4; t++) {
@@ -315,12 +394,15 @@ int handleStreamConfig(struct streamSetup *streamSetup, struct streamConfig *str
     streamSetup->readSizeMultiplier = 1;
 
     if (streamSetup->samplerate <= 20) {
-        streamSetup->samplesPerPacket = streamSetup->numberOfChannels;
-        streamSetup->readSamples = streamSetup->numberOfChannels;
+        streamSetup->samplesPerPacket = 1; //streamSetup->numberOfChannels;
+        streamSetup->readSamples = 1; //streamSetup->numberOfChannels;
     }
     else if (streamSetup->samplerate > 20 && streamSetup->samplerate <= 150) {
         streamSetup->samplesPerPacket = streamSetup->numberOfChannels*2;
         streamSetup->readSamples = streamSetup->numberOfChannels*2;
+        //streamSetup->samplesPerPacket = 25;
+        //streamSetup->readSizeMultiplier = 2;
+        //streamSetup->readSamples = 25;
     }
     else if (streamSetup->samplerate > 150 && streamSetup->samplerate <= 500) {
         streamSetup->samplesPerPacket = streamSetup->numberOfChannels*4;
@@ -338,9 +420,9 @@ int handleStreamConfig(struct streamSetup *streamSetup, struct streamConfig *str
             case 4:
                 // This is not good. High samplerates won't work with this parameters
                 // Stream reading function needs fixing to use different values.
-                streamSetup->samplesPerPacket = 24;
-                streamSetup->readSizeMultiplier = 1;
-                streamSetup->readSamples = 24;
+                streamSetup->samplesPerPacket = 25;
+                streamSetup->readSizeMultiplier = 4;
+                streamSetup->readSamples = 25;
             break;
             default:
                 streamSetup->readSizeMultiplier = 5;
@@ -365,19 +447,10 @@ int writeToFile(struct shmem *shmem, struct streamSetup *streamSetup, int value,
        fprintf(fhandle,"Over!  ");
     }
     else {
-        switch(shmem->streamConfig.sensor[ch].type) {
-        case VOLTAGE:
-            fprintf(fhandle,"%d mV ",value);
-            break;
-        case CURRENT:
-            if (shmem->ioctrl.sensorDigOutput[ch] == 0) {
-                fprintf(fhandle,"%4.1f mA ",(double)(value)*LO_GAIN_MULT);
-            }
-            else {
-                fprintf(fhandle,"%4.2f mA ",(double)(value)*HI_GAIN_MULT);
-            }
-            break;
-        }
+        double conv_value = 0;
+        char value_str[10];
+        convert(shmem, value, ch, &conv_value, value_str);
+        fprintf(fhandle,"%6.1f %s",conv_value, value_str);
     }
     if (ch == (streamSetup->numberOfChannels-1) ) {
         fprintf(fhandle, "\n");
@@ -391,41 +464,54 @@ int streamDataAndStore(HANDLE hDevice, struct streamSetup *streamSetup, struct s
     int i;
     double dvolt;
     unsigned int data[streamSetup->numberOfChannels * streamSetup->readSamples * streamSetup->readSizeMultiplier];
-    unsigned long readSize = 0;
+    unsigned long readSize = 0, start_ch;
+    
+    start_ch = streamSetup->start_ch;
 
     if (!streamRead(hDevice, streamSetup, sem, shmem, caliInfo, data, &readSize)) {
+
         for (i = 0; i < readSize; i++) {
             if ( (((*samples)+i) >= streamSetup->samples) && (streamSetup->samples != 0) ) {
                 break;
             }
-            getAinVoltCalibrated_hw130(caliInfo, (i % streamSetup->numberOfChannels), 31, data[i], &(dvolt));
+            //printf("i:%d numch:%d  ch:%d\n",i,streamSetup->numberOfChannels,(i % streamSetup->numberOfChannels));
+            getAinVoltCalibrated_hw130(caliInfo, ((i + start_ch) % streamSetup->numberOfChannels), 31, data[i], &(dvolt));
             dvolt = (dvolt*1000);
             if (dvolt > MAX_VALUE) {
                 dvolt = 0xffff;
             }
 
             sem_wait(sem);
-            if (addToBuf(&shmem->ch_data[i % streamSetup->numberOfChannels],(int)(nearbyint(dvolt))) < 0) {
+            if (addToBuf(&shmem->ch_data[(i + start_ch) % streamSetup->numberOfChannels],(int)(nearbyint(dvolt))) < 0) {
+                shmem->ch_data[(i + start_ch) % streamSetup->numberOfChannels].overfull = 1;
                 //printf("buf:full\n");
             }
-            if (streamSetup->fhandle != NULL) {
-                 writeToFile(shmem, streamSetup, (int)(dvolt), i % streamSetup->numberOfChannels);
-            }
             sem_post(sem);
+            if (streamSetup->fhandle != NULL) {
+                 writeToFile(shmem, streamSetup, (int)(nearbyint(dvolt)), (i + start_ch) % streamSetup->numberOfChannels);
+            }
         }
         (*samples) += i;
     }
     else {
         return -1;
     }
+
+    streamSetup->start_ch = *samples % streamSetup->numberOfChannels;
+
     return i;
 }
 
 int updateIO(HANDLE hDevice, sem_t *sem, struct shmem *shmem)
 {
     long error;
+
+    if ( (error = portDirWrite(hDevice, 0xffffff, (long)~shmem->ioctrl.digdir)) ) {
+        PRINTERR("PortDirWrite error: %ld\n",error);
+    }
+
     // USB_DATA switches are inverted
-    if((error = maskDO(hDevice, 0xffffff,shmem->ioctrl.iostate ^ ((1 << USB_DATA_1) | (1 << USB_DATA_2)))) != 0) {
+    if((error = maskDO(hDevice, ~(shmem->ioctrl.digdir),shmem->ioctrl.iostate ^ ((1 << USB_DATA_1) | (1 << USB_DATA_2)))) != 0) {
         PRINTERR("Error setting IO: %d\n",(int)error);
     }
     else {
@@ -579,7 +665,7 @@ int streamConfigure(HANDLE hDevice, struct streamSetup *streamSetup)
         scanInterval = 48000000/256/(streamSetup->samplerate);
     }
     else {
-        sendBuff[9] = 0x0a;  //ScanConfig:
+        sendBuff[9] = 0x09; //0x0a;  //ScanConfig:
                           // Bit 7: Reserved
                           // Bit 6: Reserved
                           // Bit 3: Internal stream clock frequency = b0: 4 MHz
@@ -776,15 +862,15 @@ int checkStreamResponse(uint8 *recBuff, int recBuffSize, struct streamSetup *str
 //Reads the StreamData low-level function response in a loop.
 //All voltages from the stream are stored in the voltages 2D array.
 int streamRead(HANDLE hDevice, struct streamSetup *streamSetup, sem_t *sem, struct shmem *shmem, 
-               u3CalibrationInfo *caliInfo, unsigned int *data, unsigned long *size )
+               u3CalibrationInfo *caliInfo, unsigned int *data, unsigned long *size)
 {
     long recBuffSize, readn,i, scanNumber = 0;
-    int recChars = 0, backLog;
-    int k, currChannel = 0,p;
+    int recChars = 0,currChannel = 0, backLog;
+    int k,p;
     //uint16 voltageBytes;
     long startTime, endTime;
     int responseSize;           //The number of bytes in a StreamData response (differs with SamplesPerPacket)
-
+    
     responseSize = (14 + streamSetup->samplesPerPacket*2) * streamSetup->readSizeMultiplier;        
     uint8 recBuff[responseSize];
     recBuffSize = 14 + streamSetup->samplesPerPacket*2;
@@ -806,7 +892,7 @@ int streamRead(HANDLE hDevice, struct streamSetup *streamSetup, sem_t *sem, stru
             checkStreamResponse(&recBuff[p*recBuffSize], recBuffSize, streamSetup);
             backLog = (int)recBuff[12 + streamSetup->samplesPerPacket*2 + (p*recBuffSize)];
             if (backLog > 100) {
-                PRINTERR("Buffer > 100\n");
+                //PRINTERR("Buffer > 100\n");
             }
             for(k = 12; k < (12 + streamSetup->samplesPerPacket*2); k += 2)
             {   
@@ -878,6 +964,28 @@ int streamStop(HANDLE hDevice)
 
     return 0;
 }
+
+// Digital port direction change
+int portDirWrite(HANDLE hDevice, long mask, long dir)
+{
+    uint8 sendBuff[7];
+    uint8 Errorcode, ErrorFrame;
+
+    sendBuff[0] = 29;                               // IOType
+    sendBuff[1] = (uint8)(mask & 0xff);             // mask command byte
+    sendBuff[2] = (uint8)((mask >> 8) & 0xff) ;     // mask command byte
+    sendBuff[3] = (uint8)((mask >> 16) & 0xff);     // mask command byte
+    sendBuff[4] = (uint8)(dir & 0xff);              // dir command byte
+    sendBuff[5] = (uint8)((dir >> 8) & 0xff) ;      // dir command byte
+    sendBuff[6] = (uint8)((dir >> 16) & 0xff);      // dir command byte
+
+    if(ehFeedback(hDevice, sendBuff, 7, &Errorcode, &ErrorFrame, NULL, 0) < 0)
+        return -1;
+    if(Errorcode)
+        return (long)Errorcode;
+    return 0;
+}
+
 
 /* ------------------------------------------------------------------------- */
 /* End of file */

@@ -26,18 +26,15 @@
 /* INCLUDE FILES */
 #include "u3.h"
 #include <unistd.h>
-#include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
-#include <semaphore.h>
 #include <sys/stat.h>
 #include <signal.h>
 #include <sys/shm.h>
+#include <stdint.h>
 #include "shmemlib.h"
 #include "hat_drv.h"
-
-#define ANS_TIME_OUT    1000    //ms
-#define DATA_TIME_OUT   800     //ms
+#include "hat_ctrl_lib.h"
 
 /* ------------------------------------------------------------------------- */
 /* EXTERNAL FUNCTION PROTOTYPES */
@@ -49,27 +46,17 @@
 	
 /* ------------------------------------------------------------------------- */
 /* CONSTANTS */
-/* None */
-	
+#define APP_NAME "hat_ctrl"	
 	
 /* ------------------------------------------------------------------------- */
 /* MACROS */
-#define APP_NAME "hat_ctrl"
 #define PRINTOUT(...) printf(APP_NAME ": " __VA_ARGS__)
 #define PRINTOUT2(...) printf(__VA_ARGS__)
 #define PRINTERR(...) fprintf(stderr, APP_NAME ": " __VA_ARGS__)
 
+/* ------------------------------------------------------------------------- */
 /* LOCAL GLOBAL VARIABLES */
-
-volatile sig_atomic_t prog_exit = 0, wait_ret = 0;
-
-sem_t *semshmem;
-sem_t *semcomm;
-
-struct ch {
-    int num;
-    int mode;
-};
+volatile sig_atomic_t prog_exit = 0;
 
 struct io_cmd {
     char *cmd_str;
@@ -89,25 +76,30 @@ const char usage[] = {
                "  -usb2data=[on|off]       Switch usb 2 data lines on or off\n"
                "  -pwr1=[on|off]           Switch power 1 output on or off\n"
                "  -pwr2=[on|off]           Switch power 2 output on or off\n"
-               "  -sio1=[on|off]           Set sensor input 1 IO line\n"
-               "  -sio2=[on|off]           Set sensor input 2 IO line\n"
-               "  -sio3=[on|off]           Set sensor input 3 IO line\n"
-               "  -sio4=[on|off]           Set sensor input 4 IO line\n"
+               "  -sio1=[on|off|hiz]       Set sensor 1 digital line\n"
+               "  -sio2=[on|off|hiz]       Set sensor 2 digital line\n"
+               "  -sio3=[on|off|hiz]       Set sensor 3 digital line\n"
+               "  -sio4=[on|off|hiz]       Set sensor 4 digital line\n"
+               "  -all=off                 Set all switches off state (Not sensors)\n"          
+               "  -all=on                  Set all switches on state (Not sensors)\n"
                " Commands:\n"
+               "  -c, --config_file FILE   Sensors configuration file\n"
                "  -ss                      Display switches status\n"
+			   "  -sn SERIALNUMBER         Connect to specific HAT device\n"
+			   "                           If not given, connecting to first HAT\n"
                "  --help                   Display this help\n"
-               "  -alloff                  Set all switches off state\n"          
-               "  -allon                   Set all switches on state\n"
                "  -stream:0                Stop data streaming\n"
-               "  -stream [OPTION...]      Start streaming\n"
-               "   Options for stream command:\n"
-               "    -sr SAMLERATE            Streaming samplerate [3-10000]. Default 100Hz\n"
-               "    -sc SAMPLES              Sample count [0-2^32]. 0=continuous. Default 10\n"
-               "    -s INPUT-TYPE            Sensor input and type [INPUT-TYPE]\n"
+               " Options for streaming:\n"
+               "  -sr SAMLERATE            Streaming samplerate [3-10000]. Default 100Hz\n"
+               "  -sc SAMPLES              Sample count [0-2^32]. 0=continuous. Default 10\n"
+               "  -s INPUT-TYPE            Sensor input and type [INPUT-TYPE]\n"
                "                             Types: 1 = None (voltage)\n"
                "                                    2 = Current\n"
+               "                                    3 = Temperature\n"
+               "                                    4 = Audio\n"
+               "                                    5 = Optical3\n"
                "                             Default 1-1\n"
-               "    -f FILENAME              Store streamed data to file\n\n"
+               "  -f FILENAME              Store streamed data to file\n\n"
                "  -stream:SAMPLERATE:sINPUT-TYPE[:sINPUT-TYPE]...:[fFILENAME]:SAMPLES\n"
                "    Starts data streaming and configures used sensors.\n\n" 
                "  Example to stream from current sensor 1 at 100Hz and 1000 samples:\n\n"
@@ -119,26 +111,32 @@ const char usage[] = {
                "  or: \n"
                "      hat_ctrl -stream -sr 100 -s 1-2 -sc 1000 -f mydata\n"};
 
-const struct io_cmd io_command[] =  {{"-usb1pwr=on",     USB_PWR_1,       1},
-                                     {"-usb1pwr=off",    USB_PWR_1,       0},
-                                     {"-usb2pwr=on",     USB_PWR_2,       1},
-                                     {"-usb2pwr=off",    USB_PWR_2,       0},
-                                     {"-usb1data=on",    USB_DATA_1,      1},
-                                     {"-usb1data=off",   USB_DATA_1,      0},
-                                     {"-usb2data=on",    USB_DATA_2,      1},
-                                     {"-usb2data=off",   USB_DATA_2,      0},
-                                     {"-pwr1=on",        DC_POWER_SHDN1,  1},
-                                     {"-pwr1=off",       DC_POWER_SHDN1,  0},
-                                     {"-pwr2=on",        DC_POWER_SHDN2,  1},
-                                     {"-pwr2=off",       DC_POWER_SHDN2,  0},
-                                     {"-sio1=on",        AN0_IO,          1},
-                                     {"-sio1=off",       AN0_IO,          0},
-                                     {"-sio2=on",        AN1_IO,          1},
-                                     {"-sio2=off",       AN1_IO,          0},
-                                     {"-sio3=on",        AN2_IO,          1},
-                                     {"-sio3=off",       AN2_IO,          0},
-                                     {"-sio4=on",        AN3_IO,          1},
-                                     {"-sio4=off",       AN3_IO,          0},
+const struct io_cmd io_command[] =  {{"-usb1pwr=on",     USB_PWR_1,       ON},
+                                     {"-usb1pwr=off",    USB_PWR_1,       OFF},
+                                     {"-usb2pwr=on",     USB_PWR_2,       ON},
+                                     {"-usb2pwr=off",    USB_PWR_2,       OFF},
+                                     {"-usb1data=on",    USB_DATA_1,      ON},
+                                     {"-usb1data=off",   USB_DATA_1,      OFF},
+                                     {"-usb2data=on",    USB_DATA_2,      ON},
+                                     {"-usb2data=off",   USB_DATA_2,      OFF},
+                                     {"-pwr1=on",        DC_POWER_SHDN1,  ON},
+                                     {"-pwr1=off",       DC_POWER_SHDN1,  OFF},
+                                     {"-pwr2=on",        DC_POWER_SHDN2,  ON},
+                                     {"-pwr2=off",       DC_POWER_SHDN2,  OFF},
+                                     {"-sio1=on",        AN0_IO,          ON},
+                                     {"-sio1=off",       AN0_IO,          OFF},
+                                     {"-sio1=hiz",       AN0_IO,          HIZ},
+                                     {"-sio2=on",        AN1_IO,          ON},
+                                     {"-sio2=off",       AN1_IO,          OFF},
+                                     {"-sio2=hiz",       AN1_IO,          HIZ},
+                                     {"-sio3=on",        AN2_IO,          ON},
+                                     {"-sio3=off",       AN2_IO,          OFF},
+                                     {"-sio3=hiz",       AN2_IO,          HIZ},
+                                     {"-sio4=on",        AN3_IO,          ON},
+                                     {"-sio4=off",       AN3_IO,          OFF},
+                                     {"-sio4=hiz",       AN3_IO,          HIZ},
+                                     {"-all=on",         0,               ALLON},
+                                     {"-all=off",        0,               ALLOFF},
                                      {"\n",              0,               0}};
 
 /* ------------------------------------------------------------------------- */
@@ -149,83 +147,13 @@ void ex_program(int sig) {
  prog_exit = 1;
 }
 
-void ret_received(int sig) {
- wait_ret = 0;
-}
-
-int sendCmdToDrv(struct shmem *shmem, unsigned int cmd)
-{
-    long starttime;
-    int ret;
-    sem_wait(semcomm);
-    shmem->hat_ctrl_pid = getpid();
-    wait_ret = 1;
-    shmem->cmd = cmd;
-    kill(shmem->hat_drv_pid, SIGUSR1);
-    starttime = getTickCount();
-    while (wait_ret && (starttime + ANS_TIME_OUT) > getTickCount());
-    if (wait_ret) {
-        PRINTERR("Command replay time out error\n");
-        ret = -1;
-    }
-    else {
-        ret = shmem->retValToCtrl;
-    }
-    sem_post(semcomm);
-    return ret;
-}
-int setDigitalIO(struct shmem *shmem, int num, int state)
-{
-    sem_wait(semshmem);
-    if (state != 0) {
-        shmem->ioctrl.iostate |= (1 << num);  
-    }
-    else {
-        shmem->ioctrl.iostate &= ~(1 << num);
-    }
-    sem_post(semshmem);
-
-    return sendCmdToDrv(shmem, CHANGE_IO);
-}
-
-int setDigitalIOMask(struct shmem *shmem, long io_mask)
-{
-    sem_wait(semshmem);
-    shmem->ioctrl.iostate = io_mask;  
-    sem_post(semshmem);
-    return sendCmdToDrv(shmem, CHANGE_IO);;
-}
-
-int convert_and_print(struct shmem *shmem, int value, int ch)
-{
-    if (value == 0xffff) {
-        PRINTOUT2("Over!  ");
-    }
-    else {
-        switch(shmem->streamConfig.sensor[ch].type) {
-        case VOLTAGE:
-            PRINTOUT2("%d mV  ",value);
-            break;
-        case CURRENT:
-            if (shmem->ioctrl.sensorDigOutput[ch] == 0) {
-                PRINTOUT2("%4.1f mA  ",(float)(value)*LO_GAIN_MULT);
-            }
-            else {
-                PRINTOUT2("%4.2f mA  ",(double)(value)*HI_GAIN_MULT);
-            }
-            break;
-        }
-    }
-    return 0;
-}
-
-void showSwitchStatus(struct shmem *shmem) 
+void showSwitchStatus(struct hatCtrl *hatCtrl) 
 {
     int k,i;
     for (i = 0; i < 20; i++) {
         k = 0;
         do {
-            if (i == io_command[k].bit && ( ((shmem->ioctrl.iostate & (1 << i)) >> i) == io_command[k].state)) {
+            if (i == io_command[k].bit && ( ((HATgetSwitchStatus(hatCtrl) & (1 << i)) >> i) == io_command[k].state)) {
                  PRINTOUT2("%s\n",io_command[k].cmd_str);
             }
         } while ( strcmp(io_command[++k].cmd_str, "\n") );
@@ -233,50 +161,28 @@ void showSwitchStatus(struct shmem *shmem)
 }
 
 
-int readAndShowData(struct shmem *shmem)
-{
-    int sample_count = 0, x = 0, ch, ret = 0, starttime;
-
-    do {
-        for (ch = 0; ch < shmem->streamConfig.sensors; ch++) {
-            starttime = getTickCount();
-            do {
-                sem_wait(semshmem);
-                ret = getFromBuf(&shmem->ch_data[ch], &x);
-                sem_post(semshmem);
-                if ( (starttime + DATA_TIME_OUT) < getTickCount()) {
-                    ret = -1;
-                    prog_exit = 1;
-                }
-            }
-            while ( ret < 0 && prog_exit == 0);
-            if (ret == 0) convert_and_print(shmem, x, ch);
-        }
-        printf("\n");
-        sample_count++;
-    } while ( !(prog_exit || (shmem->streamConfig.samples != 0 && sample_count >= shmem->streamConfig.samples)) );
-    return ret;
-}
-
 /* ------------------------------------------------------------------------- */
 /** Main
 * @param
 */
 int main(int argc, char **argv)
 {
-    struct shmem *shmem = NULL;
-    int sh_seg_id = 0, i = 0, k = 0, ret = 0, param_error = -1, val = 0, val2 = 0, show_data = 0, stream = 0;
-    char *endptr;
-    unsigned long new_iostate = 0;
-    struct streamConfig streamConfig;
+    struct hatCtrl hatCtrl;
+    int error, i = 0, k = 0, ret = 0, param_error = 0, val = 0, val2 = 0, overfull,r;
+    double value,data[4][100];
+    char *endptr, str[MAX_STRING], data_str[4][MAX_STRING];
+    struct streamConfig new_streamConfig;
+    char *SerialNumber = NULL;
+    long sample_count;
 
-    memset(&streamConfig,0,sizeof(struct streamConfig));
+    memset(&new_streamConfig,0,sizeof(struct streamConfig));
 
-    streamConfig.samplerate = 100;
-    streamConfig.samples = 10;
+    // Default parameters
+    new_streamConfig.samplerate = 100;
+    new_streamConfig.samples = 10;
 
     (void) signal(SIGINT, ex_program);
-    (void) signal(SIGUSR1, ret_received);
+    (void) signal(SIGTERM, ex_program);
 
     if (argc == 2 && (!strcmp(argv[1], "-help") || !strcmp(argv[1], "--help"))) {
         PRINTOUT2("%s",usage);
@@ -284,35 +190,44 @@ int main(int argc, char **argv)
         goto exit;
     }
 
-    semshmem = sem_open(SHMEMNAME,0,0644,0);
-
-    if(semshmem == SEM_FAILED) {
-      PRINTERR("Error: HAT driver is not started.\n");
-      ret = -1;
-      goto exit;
+    // Get SerialNumber
+    if (argc > 1) {
+        for (i = 1; i < argc; i++) {
+        	if (!strcmp(argv[i],"-sn") && (argc > (i+1))) {
+				SerialNumber = argv[++i];
+				break;
+        	}
+        }
     }
-
-    semcomm = sem_open(COMMSEM,0,0644,0);
-
-    if(semcomm == SEM_FAILED) {
-      PRINTERR("Error: HAT driver is not started.\n");
-      ret = -1;
-      goto exit;
-    }
-
-    // Allocate shared memory
-    if ( getShareMem(&shmem, &sh_seg_id) ) {
+   
+    // Open HAT driver control
+    if (HATopenDrvControl(SerialNumber, &hatCtrl)) {
         ret = -1;
         goto exit;
     }
+
     // Check parameters
     if (argc > 1) {
-        param_error = 0;
-        new_iostate = shmem->ioctrl.iostate;
-
         for (i = 1; i < argc; i++) {
-            if (!strcmp(argv[i],"--serial")) {
-                PRINTOUT2("%lX\n",shmem->serialNumber);
+        	if (!strcmp(argv[i],"-sn") && (argc > (i+1))) {
+        		i = i + 1;	// skip serialnumber
+        		continue;
+        	}
+        	if (!strcmp(argv[i],"--config_file") || !strcmp(argv[i],"-c")) {
+                if (argc > i+1) {
+                    HATreadSensorConfigFile(argv[i+1],&new_streamConfig);
+                }
+                else {
+                    param_error = 1;
+                }
+                break;
+            }
+            else if (!strcmp(argv[i],"--serial")) {
+                PRINTOUT2("%lX\n",hatCtrl.shmem->serialNumber);
+                break;
+            }
+            else if (!strcmp(argv[i],"--version")) {
+                PRINTOUT2("%s\n",SW_VERSION);
                 break;
             }
             else if (!strcmp(argv[i],"-s") && argc > (i+1)) {
@@ -326,16 +241,16 @@ int main(int argc, char **argv)
                 }
                 else {
                     val2 = strtoul(&endptr[1] ,&endptr, 10);
-                    if ( val2 >= MAX_SENSOR || val2 < 1 ) {
+                    if ( val2 > SENSOR_TYPES_MAX || val2 < 1 ) {
                         param_error = 1;
                         break;
                     }
                 }
-                if (streamConfig.sensor[val-1].type) {
+                if (new_streamConfig.sensor[val-1].type) {
                     param_error = 1;
                     break;
                 }
-                streamConfig.sensor[val-1].type = val2;
+                new_streamConfig.sensor[val-1].type = val2;
             }
             else if (!strcmp(argv[i], "-sr") && argc > (i+1)) {
                 val = strtoul(argv[++i] ,&endptr, 10);
@@ -344,7 +259,7 @@ int main(int argc, char **argv)
                     break;
                 }
                 else {
-                    streamConfig.samplerate = (unsigned int)val;
+                    new_streamConfig.samplerate = (unsigned int)val;
                 }
             }
             else if (!strcmp(argv[i], "-sc") && argc > (i+1)) {
@@ -354,19 +269,16 @@ int main(int argc, char **argv)
                     break;
                 }
                 else {
-                    streamConfig.samples = (unsigned int)val;
+                    new_streamConfig.samples = (unsigned int)val;
                 }
             }
             else if (!strcmp(argv[i], "-f") && argc > (i+1)) {
-                strcpy(streamConfig.pathFilename, argv[++i]);
+                strcpy(new_streamConfig.pathFilename, argv[++i]);
                 //streamConfig.pathFilename[strlen(argv[i])] = '\0';
             }
-            else if (!strcmp(argv[i], "-stream:0") && (argc == 2)) {
-                ret = sendCmdToDrv(shmem,STOP_STREAMING);
+            else if (!strcmp(argv[i], "-stream:0") && (argc >= 2)) {
+                ret = HATstopDataStream(&hatCtrl);
                 goto exit;
-            }
-            else if (!strcmp(argv[i], "-stream")) {
-               stream = 1;
             }
             else if (!strncmp(argv[i], "-stream:",8)) {
                 val = strtoul(argv[i]+8 ,&endptr, 10);
@@ -375,8 +287,7 @@ int main(int argc, char **argv)
                     break;
                 }
                 else {
-                    streamConfig.samplerate = (unsigned int)val;
-                    show_data = 1;
+                    new_streamConfig.samplerate = (unsigned int)val;
                 }
                 if (*endptr == ':') {
                     do {
@@ -386,28 +297,27 @@ int main(int argc, char **argv)
                         }
         
                         val = strtoul(&endptr[2] ,&endptr, 10);
-                        if ( (*endptr != '-') || val > 4 || val < 1 ) {
+                        if ( (*endptr != '-') || val > SENSOR_TYPES_MAX || val < 1 ) {
                             param_error = 1;
                             break;
                         }
                         val2 = strtoul(&endptr[1] ,&endptr, 10);
-                        if ( val2 >= MAX_SENSOR || val2 < 1 ) {
+                        if ( val2 > SENSOR_TYPES_MAX || val2 < 1 ) {
                             param_error = 1;
                             break;
                         }
-                        streamConfig.sensor[val-1].type = val2;
-                        streamConfig.sensors++;    
+                        new_streamConfig.sensor[val-1].type = val2;
+                        new_streamConfig.sensors++;    
                     } while (!strncmp(endptr,":s",2));
                     
-                    strcpy(streamConfig.pathFilename,"");
+                    strcpy(new_streamConfig.pathFilename,"");
     
                     if (!strncmp(endptr,":f",2)) {
                         endptr+=2;
-                        strncpy(streamConfig.pathFilename, endptr, strcspn(endptr, ":"));
-                        streamConfig.pathFilename[strcspn(endptr, ":")] = '\0';
-                        PRINTOUT("Streaming to: %s\n",streamConfig.pathFilename);
-                        endptr = &endptr[strlen(streamConfig.pathFilename)];
-                        show_data = 0;
+                        strncpy(new_streamConfig.pathFilename, endptr, strcspn(endptr, ":"));
+                        new_streamConfig.pathFilename[strcspn(endptr, ":")] = '\0';
+                        PRINTOUT("Streaming to: %s\n",new_streamConfig.pathFilename);
+                        endptr = &endptr[strlen(new_streamConfig.pathFilename)];
                     }
                     if (!strncmp(endptr,":",1)) {
                         val = strtoul(&endptr[1] ,&endptr, 10);
@@ -415,41 +325,24 @@ int main(int argc, char **argv)
                             param_error = 1;
                             break;
                         }
-                        streamConfig.samples = val;
+                        new_streamConfig.samples = val;
                     }
-                    else if (*endptr == 0) {
-                        show_data = 1;
-                    }
-                    else {
+                    else if (*endptr != 0) {
                         param_error = 1;
                         break;
                     }
-                    stream = 1;
                 }
             }
-            else if (!strcmp(argv[i], "-ss") && (argc == 2)) {
-                showSwitchStatus(shmem);
+            else if (!strcmp(argv[i], "-ss") && (argc >= 2)) {
+                showSwitchStatus(&hatCtrl);
                 ret = 0;
                 goto exit;
-            }
-            else if (!strcmp(argv[i], "-alloff") && (argc == 2)) {
-                PRINTOUT2("Setting all ports off.\n");
-                new_iostate &= ~PWR_USB_IOS;
-            }
-            else if (!strcmp(argv[i], "-allon") && (argc == 2)) {
-                PRINTOUT2("Setting all ports on.\n");
-                new_iostate |= PWR_USB_IOS;
             }
             else if (argc > i) {
                 k = 0;
                 do {
                     if (!strcmp(argv[i], io_command[k].cmd_str)) {
-                        if (io_command[k].state) {
-                            new_iostate |= (1 << io_command[k].bit);
-                        }
-                        else {
-                            new_iostate &= ~(1 << io_command[k].bit);
-                        }
+                        ret = HATpresetSwitchState(&hatCtrl, io_command[k].bit, io_command[k].state);
                         break;
                     }
                 } while (strcmp(io_command[++k].cmd_str, "\n"));
@@ -469,51 +362,57 @@ int main(int argc, char **argv)
         goto exit;
     }
 
-    // Set IO pins (=switches)
-    ret = setDigitalIOMask(shmem, new_iostate);
-
-    if (stream) {
-        if (shmem->streamConfig.hat_ctrl_pid != 0) {
-            PRINTERR("Error only one process can stream data. Stop previous streaming first.\n");
-            ret = -1;
-            goto exit;
-        }
-        streamConfig.sensors = 0;
-        for (k = 0; k < 4; k++) {
-            if (streamConfig.sensor[k].type) {
-                streamConfig.sensors++;
-            }
-        }
-        if (!streamConfig.sensors) {
-            // Set default setting
-            streamConfig.sensor[0].type = 1;
-            streamConfig.sensors = 1;
-        }
-        sem_wait(semshmem);
-        memcpy(&shmem->streamConfig,&streamConfig,sizeof(struct streamConfig));
-        sem_post(semshmem);
-        
-        sendCmdToDrv(shmem, STOP_STREAMING);
-        // If data is shown, store this process id to shared memmory             
-        if (streamConfig.pathFilename[0] == 0) {
-            sem_wait(semshmem);
-            shmem->streamConfig.hat_ctrl_pid = getpid();
-            sem_post(semshmem);
-        }
-        ret = sendCmdToDrv(shmem, START_STREAMING);
+    // Update digital IO
+    HATsetOuts(&hatCtrl);
     
-        if ( streamConfig.pathFilename[0] == 0 ) {
-            readAndShowData(shmem);
-            sem_wait(semshmem);
-            shmem->streamConfig.hat_ctrl_pid = 0;
-            sem_post(semshmem);
-            sendCmdToDrv(shmem,STOP_STREAMING);
+    // Start sensor(s) data streaming if needed.    
+    if (!HATstartDataStream(&hatCtrl,&new_streamConfig)) {
+        sample_count = HATsamplesToRead(&hatCtrl);
+        if (sample_count == 0) {
+            sample_count = INT32_MAX;
         }
+        do {
+            for (k = 0; k < HATsensors(&hatCtrl); k++) {
+                // Read one 1 value from specified channel
+                if ( (r = HATreadDataCh(&hatCtrl,k,data[k],1,data_str[k],&overfull)) > 0) {
+                    sample_count -= r;
+                }
+                else {
+                    PRINTERR("\nRead error!\n");
+                    ret = -1;
+                    break;
+                }
+            }
+
+            for (k = 0; k < HATsensors(&hatCtrl); k++) {
+                //printf("%5.1f %s  ",HATOpticalXYZtosRGB(data[0][0], data[1][0], data[2][0],k,255),data_str[k]);                
+                PRINTOUT2("%5.1f %s  ",data[k][0],data_str[k]);                
+            }
+
+            // Use function for read data. Function is specified in sensor config file
+            if (!HATsensorDataFunction(&hatCtrl, 0, &value, str, &error)) {
+                PRINTOUT2("-> %s",str);
+            }
+            PRINTOUT2("\n");
+            fflush(NULL);
+
+            if (overfull) {
+                PRINTERR("Buffer overrun!\n");
+                ret = -1;
+                break;
+            }
+            if (prog_exit) {
+                break;
+            }
+        } while (sample_count > 0);
+        
+        // Stop streaming
+        HATstopDataStream(&hatCtrl);
     }
+
 exit:
-    sem_close(semshmem);
-    sem_close(semcomm);
-    deAllocSharedMem(shmem);
+    // Close HAT driver control
+    HATcloseDrvControl(&hatCtrl);
     return ret;
 }
 

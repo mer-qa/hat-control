@@ -25,13 +25,20 @@
 
 #include <sys/types.h>
 #include <stdio.h>
+#include <semaphore.h>
 
+#define MAX_LEN_NAME 30
 // Shared memory properties
-#define SH_MEM_ID   0xaa
+// #define SH_MEM_ID   0xaa
+int SH_MEM_ID;
 #define SH_MEM_SEG_SIZE 0x6400
-#define SHMEMNAME "HATSHMEM"
-#define COMMSEM   "HATSHCOMM"
+// #define SHMEMNAME "HATSHMEM"
+char SHMEMNAME[MAX_LEN_NAME];
+// #define COMMSEM   "HATSHCOMM"
+char COMMSEM[MAX_LEN_NAME];
 
+// Max sensor inputs
+#define MAX_SENSOR_INPUTS    4
 
 // Data buffer size for each channel in shared memory
 #define BUF_SIZE 1000
@@ -45,22 +52,45 @@ struct rbuf {
 
 struct ioctrl {
     unsigned int iostate;
-    unsigned int sensorDigOutput[4];
+    unsigned int digdir;
+    unsigned int sensorDigOutput[MAX_SENSOR_INPUTS];
 };
+
+// Data store for data handling.
+// This is used if function key is specified in sensor configuration
+
+struct data_function {
+    unsigned int function;
+    unsigned int size;
+    double *fdata;
+    unsigned int stored;
+};
+
+#define MULTIPLE_FIRST      1
+#define OFFSET_FIRST    2
 
 struct sensor {
     unsigned int type;
-    unsigned int offset_mv;
-    unsigned int mult_mv;
+    int offset_mv;
+    int mult_mv[2];
+    int offset_mult_order;
+    char str[2][10];
+    int samplerate;
+    char pathFilename[255];
+    struct data_function data_func;
 };
 
 struct streamConfig {
     unsigned int sensors;
-    struct sensor sensor[4];
+    unsigned int ch_table[MAX_SENSOR_INPUTS];
+    struct sensor sensor[MAX_SENSOR_INPUTS];
     unsigned int samplerate;
     char pathFilename[255];
     unsigned long samples;
     pid_t hat_ctrl_pid;
+    long digout;
+    long digdir;
+    unsigned long time_between_samples;
 };
 
 struct streamSetup {
@@ -70,11 +100,12 @@ struct streamSetup {
     unsigned int readSizeMultiplier;
     unsigned int readSamples;
     unsigned long samples;
+    unsigned int start_ch;
     FILE *fhandle;
 };
 
 struct shmem {
-    struct rbuf ch_data[4];
+    struct rbuf ch_data[MAX_SENSOR_INPUTS];
     pid_t hat_drv_pid;
     pid_t hat_ctrl_pid;
     int retValToCtrl;
@@ -82,6 +113,13 @@ struct shmem {
     unsigned int cmd;
     struct streamConfig streamConfig;
     unsigned long serialNumber;
+};
+
+struct hatCtrl {
+    struct shmem *shmem;
+    sem_t *semshmem;
+    sem_t *semcomm;
+    double time;
 };
 
 int getShareMem(struct shmem **shmem, int *segment_id);
@@ -94,6 +132,13 @@ int getBufSize(struct rbuf *buf);
 int addToBuf(struct rbuf *buf, int value);
 int getFromBuf(struct rbuf *buf, int *value);
 
+void getShName(char *SerialNumber, char *semaphoreName);
+void getShComm(char *SerialNumber, char *semaphoreName);
+// Names are HATSHMEM_[SN] and HATSHCOMM_[SN]
+void getShMemID(char *SerialNumber);
+// Get weak "CheckSum" from SN. It is used as shared mem ID
+int hash(char *str, unsigned int *hashValue);
+// calculate weak "CheckSum"
 #endif
 
 /* ------------------------------------------------------------------------- */

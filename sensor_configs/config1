@@ -1,0 +1,53 @@
+#----------------------------------------------------
+# This is example configuration for HAT device sensors
+#
+#----------------------------------------------------
+
+[Common]
+Samplerate=500
+Samples=0
+
+[Sensor1]
+Type=Current
+Samplerate=10
+String0=
+String1=
+Dout=0 #0 = high range, 1 = low range
+DataFile=
+Offset=
+Multiplier0=
+Multiplier1=
+
+[Sensor2]
+Type=Current
+Samplerate=10
+String0=
+String1=
+Dout=0 # 0 = left input, 1 = right input
+DataFile=
+Offset=0
+Multiplier0=0
+Multiplier1=0
+
+[Sensor3]
+Type=Current
+Samplerate=10
+String0=
+String1=
+Dout=0 # 0 = left input, 1 = right input
+DataFile=
+Offset=0
+Multiplier0=0
+Multiplier1=0
+
+[Sensor4]
+Type=Current
+Samplerate=10
+String0=
+String1=
+Dout=0 # 0 = left input, 1 = right input
+DataFile=
+Offset=0
+Multiplier0=0
+Multiplier1=0
+

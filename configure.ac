@@ -7,4 +7,7 @@ AC_CONFIG_FILES([
 	src/Makefile
 	libhatcontrol.pc
 	])
+PKG_CHECK_MODULES([DEPS], [
+ glib-2.0 >= 2.24.1
+])
 AC_OUTPUT

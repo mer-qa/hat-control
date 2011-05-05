@@ -125,6 +125,10 @@ HANDLE openUSBConnection( int localID);
 //Opens a U3 with the given localID.  Returns NULL on failure, or a HANDLE on
 //success.
 
+HANDLE openUSBConnectionDev(int devID);
+//Opens a U3 with the given devID.  Returns NULL on failure, or a HANDLE on
+//success.
+
 // Resets device
 int resetDev(HANDLE hDevice);
 

@@ -183,10 +183,12 @@ HANDLE openUSBConnection(int localID)
                 if( recBuffer[6] != 0)
                     goto locid_error;
 
-                if( (int)recBuffer[21] == localID)
+                if( (int)recBuffer[21] == localID) {
                     return hDevice;
-                else
+                } else {
+                	printf("This U3 ID: %d\n", (int)recBuffer[21]);
                     LJUSB_CloseDevice(hDevice);
+                }
             } //else localID >= 0 end
         } //if hDevice != NULL end
     } //for end
@@ -197,6 +199,33 @@ HANDLE openUSBConnection(int localID)
 locid_error:
     printf("Open error: problem when checking local ID\n");
     return NULL;
+}
+
+
+HANDLE openUSBConnectionDev(int devID)
+{
+    HANDLE hDevice = 0;
+    uint32 numDevices = 0;
+
+    numDevices = LJUSB_GetDevCount(U3_PRODUCT_ID);
+    if(numDevices == 0)
+    {
+        printf("Open error: No U3 devices could be found\n");
+        return NULL;
+    }
+    if (devID <= numDevices) {
+        hDevice = LJUSB_OpenDevice(devID, 0, U3_PRODUCT_ID);
+        if(hDevice != NULL) {
+			return hDevice;
+		} else {
+            printf("Open error: could not find a U3 with a devID of %d\n", devID);
+            return NULL;
+		}
+    } else {
+    	//printf("Open error: Only %d U3 devices found\n", numDevices);
+        return NULL;
+
+    }
 }
 
 
@@ -244,10 +273,10 @@ invalid:
 
 int resetDev(HANDLE hDevice)
 {
-    uint8 sendBuffer[8], recBuffer[40];
+    //uint8 sendBuffer[8], recBuffer[40];
     uint8 cU3SendBuffer[26], cU3RecBuffer[38];
     int sentRec = 0;
-    int i = 0, offset = 0;
+    //int i = 0, offset = 0;
 
     /* sending ConfigU3 command to get hardware version and see if HV */
     cU3SendBuffer[1] = (uint8)(0x99);  //command byte

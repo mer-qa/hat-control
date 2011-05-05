@@ -152,5 +152,57 @@ int deAllocSharedMem(struct shmem *shmem)
   return shmdt (shmem);
 }
 
+int hash(char *str, unsigned int *hashValue) {
+     int c;
+
+     while ((c = (int)*str++)) {
+    	 *hashValue = ((*hashValue << 5) + *hashValue) + c;
+     }
+     return 0;
+}
+
+void getShName(char *SerialNumber, char *semaphoreName) {
+
+	/* initialize parameters */
+	strcpy (semaphoreName,"HATSHMEM_");
+
+	if (SerialNumber != NULL && strlen(SerialNumber) > 0) {
+		if (strlen(semaphoreName) + strlen(SerialNumber) + 1 > MAX_LEN_NAME) {
+			printf("SN too long\n");
+		} else {
+			strncat(semaphoreName, SerialNumber, MAX_LEN_NAME - strlen(semaphoreName) - 1);
+			semaphoreName[MAX_LEN_NAME - 1] = '\0';
+		}
+	}
+	//printf("New ShMemName: %s\n", semaphoreName);
+}
+
+void getShComm(char *SerialNumber, char *semaphoreName) {
+	strcpy (semaphoreName,"HATSHCOMM_");
+
+	if (SerialNumber != NULL && strlen(SerialNumber) > 0) {
+		if (strlen(semaphoreName) + strlen(SerialNumber) + 1 > MAX_LEN_NAME) {
+			printf("SN too long");
+		} else {
+			strncat(semaphoreName, SerialNumber, MAX_LEN_NAME - strlen(semaphoreName) - 1);
+			semaphoreName[MAX_LEN_NAME - 1] = '\0';
+		}
+	}
+	//printf("New CommSem: %s\n", semaphoreName);
+}
+
+void getShMemID(char *SerialNumber) {
+	unsigned int hashValue = 112233;
+	unsigned int *hashValueP;
+	hashValueP = &hashValue;
+	if (SerialNumber != NULL && strlen(SerialNumber) > 0) {
+		hash(SerialNumber, hashValueP);
+		//printf("d %d\n", (int)hashValue);
+		SH_MEM_ID = (unsigned int)hashValue;
+	} else {
+		SH_MEM_ID = 0xaa;
+	}
+    //printf("New shared mem id: %d\n", SH_MEM_ID);
+}
 /* ------------------------------------------------------------------------- */
 /* End of file */

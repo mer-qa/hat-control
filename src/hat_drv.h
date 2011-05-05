@@ -23,12 +23,7 @@
 #ifndef HATDRVH
 #define HATDRVH
 
-// Current sensor multipliers
-// R4 = 141k (47k x 3)
-//#define LO_GAIN_MULT    0.60024 // R9 = 6k6 (2k2 x 3)
-//#define HI_GAIN_MULT    0.04058 // R8 = 287k
-#define LO_GAIN_MULT    0.615087 // V2 board: 140k, 6k49, 274k
-#define HI_GAIN_MULT    0.041962 // Trimmers at middle position (2.5k and 50ohm)
+#define SW_VERSION "0.1"
 
 // Maximun input voltge
 #define MAX_VALUE   2467
@@ -39,11 +34,15 @@
 #define START_STREAMING 2
 #define STOP_STREAMING  3
 
+#define MAX_SENSOR      5
+
+#define SENSOR_TYPES_MAX 5
+
 // Sensor types
 #define NONE            0
 #define VOLTAGE         1
 #define CURRENT         2
-#define MAX_SENSOR      3
+#define TEMP            3
 //#define LIGHT           3
 //#define ACCELERATION    4
 //#define TEMPERATURE     5
@@ -55,7 +54,7 @@
 #define AI1             2
 #define AI2             4
 #define AI3             6
-const int ach[] = {AI0, AI1, AI2, AI3};
+static const int ach[] = {AI0, AI1, AI2, AI3};
 
 // Digital IO lines
 #define AN0_IO          8
@@ -71,5 +70,7 @@ const int ach[] = {AI0, AI1, AI2, AI3};
 
 #define PWR_USB_IOS     ((1 << USB_DATA_1) | (1 << USB_DATA_2) | (1 << USB_PWR_1) | (1 << USB_PWR_2) | (1 << DC_POWER_SHDN1) | (1 << DC_POWER_SHDN2))
 #define SENSOR_IOS      ((1 << AN0_IO) | (1 << AN1_IO) | (1 << AN2_IO) | (1 << AN3_IO))
-#endif
 
+
+#endif
+/* End of file */
