@@ -5,7 +5,7 @@
 
 [Common]
 Samplerate=10
-Samples=0
+Samples=10
 
 [Sensor1]
 Type=Temperature

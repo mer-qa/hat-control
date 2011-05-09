@@ -1,5 +1,5 @@
 #----------------------------------------------------
-# This is example configuration for HAT device sensors
+# This is example configuration for HAT audio sensor
 #
 #----------------------------------------------------
 
@@ -17,8 +17,8 @@ String1=
 Dout=0 # 0 = left input, 1 = right input
 Datafile=data.txt
 Offset=0
-Multiplier0=0
-Multiplier1=0
+Multiplier0=1
+Multiplier1=1
 
 #[Sensor2]
 #Type=Temperature
@@ -27,9 +27,9 @@ Multiplier1=0
 #String1=C 
 #Dout=0 #0 = high range, 1 = low range
 #Datafile=
-#Offset=
-#Multiplier0=
-#Multiplier1=
+#Offset=0
+#Multiplier0=1
+#Multiplier1=1
 
 #[Sensor3]
 #Type=Current
@@ -39,8 +39,8 @@ Multiplier1=0
 #Dout=0 # 0 = left input, 1 = right input
 #Datafile=
 #Offset=0
-#Multiplier0=0
-#Multiplier1=0
+#Multiplier0=1
+#Multiplier1=1
 
 #[Sensor4]
 #Type=Current
@@ -50,6 +50,6 @@ Multiplier1=0
 #Dout=0 # 0 = left input, 1 = right input
 #Datafile=
 #Offset=0
-#Multiplier0=0
-#Multiplier1=0
+#Multiplier0=1
+#Multiplier1=1
 

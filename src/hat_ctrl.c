@@ -215,7 +215,7 @@ int main(int argc, char **argv)
         	}
         	if (!strcmp(argv[i],"--config_file") || !strcmp(argv[i],"-c")) {
                 if (argc > i+1) {
-                    HATreadSensorConfigFile(argv[i+1],&new_streamConfig);
+                    HATreadSensorConfigFile(&hatCtrl,argv[i+1],&new_streamConfig);
                 }
                 else {
                     param_error = 1;
@@ -386,13 +386,13 @@ int main(int argc, char **argv)
 
             for (k = 0; k < HATsensors(&hatCtrl); k++) {
                 //printf("%5.1f %s  ",HATOpticalXYZtosRGB(data[0][0], data[1][0], data[2][0],k,255),data_str[k]);                
-                PRINTOUT2("%5.1f %s  ",data[k][0],data_str[k]);                
+                PRINTOUT2("%5.2f %s  ",data[k][0],data_str[k]);                
             }
 
             // Use function for read data. Function is specified in sensor config file
-            if (!HATsensorDataFunction(&hatCtrl, 0, &value, str, &error)) {
-                PRINTOUT2("-> %s",str);
-            }
+            //if (!HATsensorDataFunction(&hatCtrl, 0, &value, str, &error)) {
+            //    PRINTOUT2("-> %s %.2f",str, value);
+            //}
             PRINTOUT2("\n");
             fflush(NULL);
 
@@ -405,7 +405,12 @@ int main(int argc, char **argv)
                 break;
             }
         } while (sample_count > 0);
-        
+
+        if (!HATsensorDataFunction(&hatCtrl, 0, &value, str, &error)) {
+            PRINTOUT2("-> %s %.2f",str, value);
+        }
+        PRINTOUT2("\n");
+
         // Stop streaming
         HATstopDataStream(&hatCtrl);
     }

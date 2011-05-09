@@ -222,11 +222,11 @@ double voltageToTemp(double volt, int state)
  * @param value_str sensor specified string 
  * @return 0 success and -1 failure
  */
-int convert(struct shmem *shmem, int value, int ch, double *conv_value, char *value_str)
+int convert(struct shmem *shmem, double value, int ch, double *conv_value, char *value_str)
 {
-    int sensor_type;
+    int sensor_type, dout;
 
-    if (value != 0xffff) {
+    if (value < 0xffff) {
         sensor_type = shmem->streamConfig.sensor[ch].type;    
         if (sensor_params[sensor_type].convert == NULL) {
             *conv_value = (double)value;
@@ -235,24 +235,35 @@ int convert(struct shmem *shmem, int value, int ch, double *conv_value, char *va
             *conv_value = sensor_params[sensor_type].convert( (double)value, shmem->ioctrl.sensorDigOutput[ch]);
         }
 
-        if (shmem->streamConfig.sensor[ch].offset_mult_order == OFFSET_FIRST) {
-            *conv_value += (sensor_params[sensor_type].offset + shmem->streamConfig.sensor[ch].offset_mv);
-        }
-
-        if (!shmem->ioctrl.sensorDigOutput[ch]) {
-            *conv_value *= (sensor_params[sensor_type].multiplier0 * shmem->streamConfig.sensor[ch].mult_mv[0]);
+        if (shmem->ioctrl.sensorDigOutput[ch]) {
+            dout = 1;
+            *conv_value += (sensor_params[sensor_type].offset[dout]);
+            *conv_value *= sensor_params[sensor_type].multiplier1;
         }
         else {
-            *conv_value *= (sensor_params[sensor_type].multiplier1 * shmem->streamConfig.sensor[ch].mult_mv[1]);
+            dout = 0;
+            *conv_value += (sensor_params[sensor_type].offset[dout]);
+            *conv_value *= sensor_params[sensor_type].multiplier0;
         }
+
+        if (shmem->streamConfig.sensor[ch].offset_mult_order == OFFSET_FIRST) {
+            *conv_value += shmem->streamConfig.sensor[ch].offset_mv;
+        }
+
+        *conv_value *= shmem->streamConfig.sensor[ch].mult_mv[dout];
 
         if (shmem->streamConfig.sensor[ch].offset_mult_order == MULTIPLE_FIRST) {
-            *conv_value += (sensor_params[sensor_type].offset + shmem->streamConfig.sensor[ch].offset_mv);
+            *conv_value += shmem->streamConfig.sensor[ch].offset_mv;
         }
+        if (value_str != NULL) 
+            strcpy(value_str, shmem->streamConfig.sensor[ch].str[0]);
+    }
+    else {
+        *conv_value = 0xffff;
+        if (value_str != NULL) 
+            strcpy(value_str, "OVER!");
     }
 
-    if (value_str != NULL) 
-        strcpy(value_str, shmem->streamConfig.sensor[ch].str[0]);
     return 0;
 }
 
@@ -468,7 +479,7 @@ int HATreadDataCh(struct hatCtrl *hatCtrl, int ch, double *data, long size, char
             
         if (ret != -2 && avg_count[ch] == 0) {
             cch = hatCtrl->shmem->streamConfig.ch_table[ch];
-            convert(hatCtrl->shmem, avg[ch], cch, &con_val, str);
+            convert(hatCtrl->shmem, avg[ch]/10, cch, &con_val, str);
             data[stored_count++] = con_val;
             if (/*hatCtrl->shmem->streamConfig.sensor[cch].data_func.function > 0 && */ hatCtrl->shmem->streamConfig.sensor[cch].data_func.fdata != NULL) {
                 hatCtrl->shmem->streamConfig.sensor[cch].data_func.fdata[hatCtrl->shmem->streamConfig.sensor[cch].data_func.stored++] = con_val;
@@ -911,9 +922,9 @@ const char *data_functions[] = {"Audio_latency","Average","Optic_get_color", NUL
  * @param streamConfig struct streamConfig
  * @return 0 on success and -1 on failure
  */
-int HATreadSensorConfigFile(char *filename, struct streamConfig *streamConfig)
+int HATreadSensorConfigFile(struct hatCtrl *hatCtrl, char *filename, struct streamConfig *streamConfig)
 {   
-    int i,k,j,bit=0;
+    int i,k,j;
     char *val, *endptr;
     long v;
     double dval;
@@ -1049,31 +1060,7 @@ int HATreadSensorConfigFile(char *filename, struct streamConfig *streamConfig)
                         printf("Config parsing error (%s)\n",sensor_keys[i]);
                         goto error;
                     }
-                    switch (k-1) {
-                    case 0:
-                        bit = AN0_IO;
-                        break;
-                    case 1:
-                        bit = AN1_IO;
-                        break;
-                    case 2:
-                        bit = AN2_IO;
-                        break;
-                    case 3:
-                        bit = AN3_IO;
-                        break;
-                    }
-                    if (v == 2) {
-                        streamConfig->digdir |= (1 << bit);
-                    }
-                    else if (v) {
-                        streamConfig->digdir &= ~(1 << bit);
-                        streamConfig->digout |= (1 << bit);
-                    }
-                    else {
-                        streamConfig->digdir &= ~(1 << bit);
-                        streamConfig->digout &= ~(1 << bit);
-                    }
+                    HATpresetSensorIO(hatCtrl,k-1,v);
                 }
             }
             error = NULL;

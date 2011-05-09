@@ -36,8 +36,8 @@
 //#define CURRENT_SENSOR_M0    0.618087 // V2 board: 140k, 6k49, 274k
 //#define CURRENT_SENSOR_M1    0.041962 // Trimmers at middle position (2.5k and 50ohm)
 
-#define CURRENT_SENSOR_M0   0.622587 // 0.615087 V2 board: 140k, 6k49, 274k
-#define CURRENT_SENSOR_M1   0.041690 // 0.041962 // Trimmers at middle position (2.5k and 50ohm)
+#define CURRENT_SENSOR_M0   0.622587 // V2 board: 140k, 6k49, 274k
+#define CURRENT_SENSOR_M1   0.041910 // Calibrated
 
 #define MAX_STRING  50
 
@@ -54,10 +54,9 @@ int HATstopDataStream(struct hatCtrl *hatCtrl);
 int HATstartDataStream(struct hatCtrl *hatCtrl, struct streamConfig *new_streamConfig);
 int HATsetOuts(struct hatCtrl *hatCtrl);
 int HATsetSensorDigOut(struct hatCtrl *hatCtrl, int ch, int state);
-int HATreadSensorConfigFile(char *filename, struct streamConfig *streamConfig);
+int HATreadSensorConfigFile(struct hatCtrl *hatCtrl, char *filename, struct streamConfig *streamConfig);
 int HATreadDataCh(struct hatCtrl *hatCtrl, int ch, double *data, long size, char *str, int *overfull);
 long HATgetSwitchStatus(struct hatCtrl *hatCtrl);
-
 int HATOpticalDetectColor(struct hatCtrl *hatCtrl, double cX, double cY, double cZ, char *str);
 double HATOpticalXYZtosRGB(double cX, double cY, double cZ, int c, int range);
 int HATsensorDataFunction(struct hatCtrl *hatCtrl, int ch, double *value, char *str, int *error);
@@ -72,21 +71,19 @@ double voltageToTemp(double volt, int state);
 struct senparams {
     double multiplier0;
     double multiplier1;
-    double offset;
+    double offset[2];
     double (*convert)(double,int);
 };
 
-static const struct senparams sensor_params[] = {{ 1,                   1,                  0,       NULL            }, // None
-                                                 { 1,                   1,                  0,       NULL            }, // Voltage
-                                                 { CURRENT_SENSOR_M0,   CURRENT_SENSOR_M1,  0,       NULL            }, // Current
-                                                 { 1,                   1,                  0,       &voltageToTemp  }, // Temp
-                                                 { 1,                   1,                 -1238,    NULL            }, // Audio
-                                                 {-0.10625,            -0.10625,           -2404,    NULL            }, // Optical3
-                                                 { 1,                   1,                  0,       NULL            }};
+static const struct senparams sensor_params[] = {{ 1,                   1,                  {0,     0},      NULL            }, // None
+                                                 { 1,                   1,                  {0,     0},      NULL            }, // Voltage
+                                                 { CURRENT_SENSOR_M0,   CURRENT_SENSOR_M1,  {0,    -5},      NULL            }, // Current
+                                                 { 1,                   1,                  {0,     0},      &voltageToTemp  }, // Temp
+                                                 { 1,                   1,                  {-1238,-1238},   NULL            }, // Audio
+                                                 {-0.10625,            -0.10625,            {-2404,-2404},   NULL            }, // Optical3
+                                                 { 1,                   1,                  {0,     0},      NULL            }};
 
-int convert(struct shmem *shmem, int value, int ch, double *conv_value, char *value_str);
-
-
+int convert(struct shmem *shmem, double value, int ch, double *conv_value, char *value_str);
 int getLatency(struct hatCtrl *hatCtrl, unsigned int ch, double *value, char *str);
 int getAvg(struct hatCtrl *hatCtrl, unsigned int ch, double *value, char *str);
 int getColor(struct hatCtrl *hatCtrl, unsigned int ch, double *value, char *str);
@@ -102,3 +99,4 @@ static const struct data_func data_func_array[] = {{NULL,       },  // None
                                                    {NULL,       }};
 
 #endif
+/* End of file */

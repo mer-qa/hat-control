@@ -1,54 +1,54 @@
 #----------------------------------------------------
-# This is example configuration for HAT device sensors
+# This is example configuration for HAT audio sensor
 #
 #----------------------------------------------------
 
 [Common]
 Samplerate=8000
-Samples=0
+Samples=16000
 
 [Sensor1]
 Type=Audio
-Function=Audio_latency
+Function=#Audio_latency
 Samplerate=8000
 String0=
 String1=
 Dout=0 # 0 = left input, 1 = right input
 Datafile=
 Offset=0
-Multiplier0=0
-Multiplier1=0
+Multiplier0=1
+Multiplier1=1
 
 #[Sensor2]
-#Type=Temperature
+#Type=Audio
 #Samplerate=2000
-#String0=C 
-#String1=C 
+#String0= 
+#String1= 
 #Dout=0
 #Datafile=
 #Offset=
-#Multiplier0=
-#Multiplier1=
+#Multiplier0=1
+#Multiplier1=1
 
 #[Sensor3]
-#Type=Current
-#Samplerate=10
+#Type=Audio
+#Samplerate=2000
 #String0=
 #String1=
 #Dout=0
 #Datafile=
 #Offset=0
-#Multiplier0=0
-#Multiplier1=0
+#Multiplier0=1
+#Multiplier1=1
 
 #[Sensor4]
-#Type=Current
-#Samplerate=10
+#Type=Audio
+#Samplerate=2000
 #String0=
 #String1=
-#Dout=0 #
+#Dout=0
 #Datafile=
 #Offset=0
-#Multiplier0=0
-#Multiplier1=0
+#Multiplier0=1
+#Multiplier1=1
 

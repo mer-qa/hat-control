@@ -5,13 +5,13 @@
 
 [Common]
 Samplerate=5
-Samples=0
+Samples=10
 
 [Sensor1]
 Type=Optical3
 Function=Optic_get_color
 Samplerate=5
-String0=
+String0=RGB
 String1=
 Dout=0 # No function for optical3 sensor
 Datafile=

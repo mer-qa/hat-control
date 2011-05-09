@@ -491,8 +491,14 @@ long getAinVoltCalibrated_hw130(u3CalibrationInfo *caliInfo, uint8 positiveChann
     {
         if(caliInfo->highVoltage == 1 && positiveChannel < 4)
             *analogVolt = caliInfo->ccConstants[12+positiveChannel]*((double)bytesVolt) + caliInfo->ccConstants[16+positiveChannel];
-        else
-            *analogVolt = caliInfo->ccConstants[0]*((double)bytesVolt) + caliInfo->ccConstants[1];
+        else {
+            if (bytesVolt == 0) {
+                *analogVolt = 0; //caliInfo->ccConstants[0]*((double)bytesVolt);
+            }
+            else {
+                *analogVolt = caliInfo->ccConstants[0]*((double)bytesVolt) + caliInfo->ccConstants[1];
+            }
+        }
     }
     else if(negChannel == 32)  //special range (binary value should be from a differential AIN reading with negative channel 30)
     {

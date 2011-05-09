@@ -57,7 +57,7 @@ int updateIO(HANDLE hdevice, sem_t *sem, struct shmem *shmem);
 long maskDO(HANDLE Handle, long wmask, long smask);
 int streamDataAndStore(HANDLE hDevice, struct streamSetup *streamSetup, struct shmem *shmem, 
                        u3CalibrationInfo *caliInfo, sem_t *sem, unsigned long *samples);
-int writeToFile(struct shmem *shmem, struct streamSetup *streamSetup, int value, int ch);
+int writeToFile(struct shmem *shmem, struct streamSetup *streamSetup, double value, int ch);
 int handleStreamConfig(struct streamSetup *streamSetup, struct streamConfig *streamConfig);
 void sendRespToCtrl(struct shmem *shmem, int ret);
 int portDirWrite(HANDLE hDevice, long mask, long dir);
@@ -440,7 +440,7 @@ int handleStreamConfig(struct streamSetup *streamSetup, struct streamConfig *str
     }
 }   
 
-int writeToFile(struct shmem *shmem, struct streamSetup *streamSetup, int value, int ch)
+int writeToFile(struct shmem *shmem, struct streamSetup *streamSetup, double value, int ch)
 {
     FILE *fhandle = streamSetup->fhandle;
     if (value == 0xffff) {
@@ -474,7 +474,7 @@ int streamDataAndStore(HANDLE hDevice, struct streamSetup *streamSetup, struct s
             if ( (((*samples)+i) >= streamSetup->samples) && (streamSetup->samples != 0) ) {
                 break;
             }
-            //printf("i:%d numch:%d  ch:%d\n",i,streamSetup->numberOfChannels,(i % streamSetup->numberOfChannels));
+            
             getAinVoltCalibrated_hw130(caliInfo, ((i + start_ch) % streamSetup->numberOfChannels), 31, data[i], &(dvolt));
             dvolt = (dvolt*1000);
             if (dvolt > MAX_VALUE) {
@@ -482,13 +482,13 @@ int streamDataAndStore(HANDLE hDevice, struct streamSetup *streamSetup, struct s
             }
 
             sem_wait(sem);
-            if (addToBuf(&shmem->ch_data[(i + start_ch) % streamSetup->numberOfChannels],(int)(nearbyint(dvolt))) < 0) {
+            if (addToBuf(&shmem->ch_data[(i + start_ch) % streamSetup->numberOfChannels],(int)(nearbyint(dvolt*10))) < 0) {
                 shmem->ch_data[(i + start_ch) % streamSetup->numberOfChannels].overfull = 1;
                 //printf("buf:full\n");
             }
             sem_post(sem);
             if (streamSetup->fhandle != NULL) {
-                 writeToFile(shmem, streamSetup, (int)(nearbyint(dvolt)), (i + start_ch) % streamSetup->numberOfChannels);
+                 writeToFile(shmem, streamSetup, dvolt, (i + start_ch) % streamSetup->numberOfChannels);
             }
         }
         (*samples) += i;

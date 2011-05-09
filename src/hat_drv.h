@@ -26,7 +26,7 @@
 #define SW_VERSION "0.1"
 
 // Maximun input voltge
-#define MAX_VALUE   2467
+#define MAX_VALUE   2452
 
 // Command for driver
 #define NONE            0
@@ -34,7 +34,7 @@
 #define START_STREAMING 2
 #define STOP_STREAMING  3
 
-#define MAX_SENSOR      5
+#define MAX_SENSOR      4
 
 #define SENSOR_TYPES_MAX 5
 
