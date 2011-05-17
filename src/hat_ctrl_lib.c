@@ -58,11 +58,9 @@
 #define MAX_SAMPLERATE  10000   //Hz
 
 // Temperature sensor parameters
-#define VOLTAGE_VS      5.0     //V
-#define R6              4700.0  //ohm
-#define R5              4700.0  //ohm
-#define R8              1000.0  //ohm
-#define GAIN            9.2
+#define CURR            0.99517629  //mA
+#define R13             1000.0      //ohm
+#define GAIN            6.1
 
 // Parameters for audio latency calculation
 #define IGNORE_TIME     0.040   //s
@@ -186,9 +184,8 @@ float GetPt100Temperature(float r)
  */
 double voltageToResistance(double volt)
 {
-    double v1 = R8/(R8+R5)*VOLTAGE_VS;
     volt = volt / 1000; 
-    return ((volt*R6)/GAIN + v1*R6)/(VOLTAGE_VS - (volt/GAIN) - v1);
+    return (volt + GAIN*CURR/1000*R13)/(GAIN*CURR/1000);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -209,7 +206,7 @@ double resistanceToTemp(double res)
  */
 double voltageToTemp(double volt, int state)
 {
-    //printf("vtor:%f    ",voltageToResistance(volt));
+    printf("vtor:%f    ",voltageToResistance(volt));
     return resistanceToTemp(voltageToResistance(volt));
 }
 
@@ -653,6 +650,9 @@ int HATopenDrvControl(char *SerialNumber, struct hatCtrl *hatCtrl)
         ret = -1;
         goto exit;
     }
+
+    hatCtrl->shmem->streamConfig.digdir = hatCtrl->shmem->ioctrl.digdir;
+    hatCtrl->shmem->streamConfig.digout = hatCtrl->shmem->ioctrl.iostate;
 
     (void) signal(SIGUSR1, ret_received);
 
