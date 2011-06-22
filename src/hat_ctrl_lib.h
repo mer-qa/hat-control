@@ -40,6 +40,7 @@
 #define CURRENT_SENSOR_M1   0.041910 // Calibrated
 
 #define MAX_STRING  50
+#define MAX_DATA    100
 
 // Digital io states
 #define OFF     0
@@ -47,6 +48,20 @@
 #define HIZ     2
 #define ALLON   3
 #define ALLOFF  4
+
+#define DATA_NO_WAIT    0
+#define DATA_WAIT       1
+
+#define DATA_TIME_OUT   500     //ms
+
+#define NO_DATA -0xffff
+
+struct HATdata {
+    double data[MAX_DATA];
+    char str[MAX_STRING];
+    unsigned long size;
+    //struct HATdata ext_data[3];
+};
 
 int HATcloseDrvControl(struct hatCtrl *hatCtrl);
 int HATopenDrvControl(char *SerialNumber, struct hatCtrl *hatCtrl);
@@ -63,39 +78,48 @@ int HATsensorDataFunction(struct hatCtrl *hatCtrl, int ch, double *value, char *
 int HATsensors(struct hatCtrl *hatCtrl);
 int HATsamplesToRead(struct hatCtrl *hatCtrl);
 int HATpresetSwitchState(struct hatCtrl *hatCtrl, int sw_bit, int state);
+int HATpresetSensorIO(struct hatCtrl *hatCtrl, int ch, int state);
+
+int HATreadData(struct hatCtrl *hatCtrl, struct HATdata *HATdata, unsigned int size, int *overfull, int mode);
 
 
 
 double voltageToTemp(double volt, int state);
 
 struct senparams {
-    double multiplier0;
-    double multiplier1;
-    double offset[2];
+    double multiplier[3];
+    double offset[3];
     double (*convert)(double,int);
 };
 
-static const struct senparams sensor_params[] = {{ 1,                   1,                  {0,     0},      NULL            }, // None
-                                                 { 1,                   1,                  {0,     0},      NULL            }, // Voltage
-                                                 { CURRENT_SENSOR_M0,   CURRENT_SENSOR_M1,  {0,    -5},      NULL            }, // Current
-                                                 { 1,                   1,                  {0,     0},      &voltageToTemp  }, // Temp
-                                                 { 1,                   1,                  {-1238,-1238},   NULL            }, // Audio
-                                                 {-0.10625,            -0.10625,            {-2404,-2404},   NULL            }, // Optical3
-                                                 { 1,                   1,                  {0,     0},      NULL            }};
+static const struct senparams sensor_params[] = {{ {1,                   1,                   1                }, {    0,    0,      0},  NULL           }, // None
+                                                 { {1,                   1,                   1                }, {    0,    0,      0},  NULL           }, // Voltage
+                                                 { {CURRENT_SENSOR_M0,   CURRENT_SENSOR_M1,   CURRENT_SENSOR_M1}, {    0,   -5,     -5},  NULL           }, // Current
+                                                 { {1,                   1,                   1                }, {    0,    0,      0},  &voltageToTemp }, // Temp
+                                                 { {1,                   1,                   1                }, {-1238,-1238,  -1238},  NULL           }, // Audio
+                                                 { {-0.10537,           -0.10537,            -0.10537          }, {-2424,-2424,  -2424},  NULL           }, // Optical3
+                                                 { {-0.10625,           -0.10625,            -0.10625          }, {-2424,-2424,  -2424},  NULL           }, // Optical
+                                                 { {1,                   1,                   1                }, {-1234-1238,  -1238},  NULL           }, // Acceleration
+                                                 { {1,                   1,                   1                }, {    0,    0,       },  NULL           }};
 
 int convert(struct shmem *shmem, double value, int ch, double *conv_value, char *value_str);
-int getLatency(struct hatCtrl *hatCtrl, unsigned int ch, double *value, char *str);
-int getAvg(struct hatCtrl *hatCtrl, unsigned int ch, double *value, char *str);
-int getColor(struct hatCtrl *hatCtrl, unsigned int ch, double *value, char *str);
+
+int getLatency(struct hatCtrl *hatCtrl, unsigned int ch, double param[], double *value, char *str);
+int getAvg(struct hatCtrl *hatCtrl, unsigned int ch, double param[], double *value, char *str);
+int getColor(struct hatCtrl *hatCtrl, unsigned int ch, double param[], double *value, char *str);
+int checkLimits(struct hatCtrl *hatCtrl, unsigned int ch, double param[], double *value, char *str);
+int getRms(struct hatCtrl *hatCtrl, unsigned int ch, double param[], double *value, char *str);
 
 struct data_func {
-    int (*data_function)(struct hatCtrl*, unsigned int ch, double*, char*);
+    int (*data_function)(struct hatCtrl*, unsigned int ch, double param[], double*, char*);
 };
 
 static const struct data_func data_func_array[] = {{NULL,       },  // None
                                                    {&getLatency },  // Get latency function for audio sensor
                                                    {&getAvg     },  // Get average 
                                                    {&getColor   },  // Get optical sensor color 
+                                                   {&checkLimits},  // Checks limits. Limit values comes from sensor config file
+                                                   {&getRms     },  // Calcualtes rms value from collected data.
                                                    {NULL,       }};
 
 #endif

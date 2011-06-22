@@ -1,27 +1,27 @@
 #----------------------------------------------------
-# This is example configuration for HAT temp sensor
+# This is example configuration for HAT device sensors
 #
 #----------------------------------------------------
 
 [Common]
-Samplerate=5
-Samples=10
+Samplerate=100
+Samples=25
 Datafile=
 
 [Sensor1]
-Type=Temperature
-Function=Average
-Samplerate=
-String0=C 
-String1=C 
-Dout=1 # 0 = input 1, 1 = input 2
+Type=Acceleration
+Function=Rms
+Samplerate=100
+String0=G
+String1=G 
+Dout=0
 Offset=0
 Multiplier0=1
 Multiplier1=1
 
 #[Sensor2]
 #Type=Temperature
-#Samplerate=100
+#Samplerate=
 #String0=C 
 #String1=C 
 #Dout=0 #0 = high range, 1 = low range

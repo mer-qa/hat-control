@@ -23,7 +23,7 @@
 #ifndef HATDRVH
 #define HATDRVH
 
-#define SW_VERSION "0.1"
+#define SW_VERSION "0.3"
 
 // Maximun input voltge
 #define MAX_VALUE   2452
@@ -36,7 +36,7 @@
 
 #define MAX_SENSOR      4
 
-#define SENSOR_TYPES_MAX 5
+#define SENSOR_TYPES_MAX 7
 
 // Sensor types
 #define NONE            0

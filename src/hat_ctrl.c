@@ -98,6 +98,8 @@ const char usage[] = {
                "                                    3 = Temperature\n"
                "                                    4 = Audio\n"
                "                                    5 = Optical3\n"
+               "                                    6 = Optical\n"
+               "                                    7 = Acceleration\n"
                "                             Default 1-1\n"
                "  -f FILENAME              Store streamed data to file\n\n"
                "  -stream:SAMPLERATE:sINPUT-TYPE[:sINPUT-TYPE]...:[fFILENAME]:SAMPLES\n"
@@ -109,7 +111,7 @@ const char usage[] = {
                "  or same to file:\n\n"
                "      hat_ctrl -stream:100:s1-2:fmydata:1000\n"
                "  or: \n"
-               "      hat_ctrl -stream -sr 100 -s 1-2 -sc 1000 -f mydata\n"};
+               "      hat_ctrl -sr 100 -s 1-2 -sc 1000 -f mydata\n"};
 
 const struct io_cmd io_command[] =  {{"-usb1pwr=on",     USB_PWR_1,       ON},
                                      {"-usb1pwr=off",    USB_PWR_1,       OFF},
@@ -160,6 +162,66 @@ void showSwitchStatus(struct hatCtrl *hatCtrl)
     }
 }
 
+/*int readOpticalSensor(struct hatCtrl *hatCtrl, int count)
+{
+    int i;
+
+    for (i = 0; i < 3; i++) {
+        if (!HATstartDataStream(&hatCtrl,&new_streamConfig)) {
+
+        }
+    }
+    // Start sensor(s) data streaming if needed.    
+    if (!HATstartDataStream(&hatCtrl,&new_streamConfig)) {
+        sample_count = HATsamplesToRead(&hatCtrl);
+        if (sample_count == 0) {
+            sample_count = INT32_MAX;
+        }
+        do {
+            for (k = 0; k < HATsensors(&hatCtrl); k++) {
+                // Read one 1 value from specified channel
+                if ( (r = HATreadDataCh(&hatCtrl,k,data[k],1,data_str[k],&overfull)) > 0) {
+                    sample_count -= r;
+                }
+                else {
+                    PRINTERR("\nRead error!\n");
+                    ret = -1;
+                    break;
+                }
+            }
+
+            for (k = 0; k < HATsensors(&hatCtrl); k++) {
+                //printf("%5.1f %s  ",HATOpticalXYZtosRGB(data[0][0], data[1][0], data[2][0],k,255),data_str[k]);                
+                PRINTOUT2("%5.2f %s  ",data[k][0],data_str[k]);                
+            }
+
+            // Use function for read data. Function is specified in sensor config file
+            if (!HATsensorDataFunction(&hatCtrl, 0, &value, str, &error)) {
+                PRINTOUT2("-> %s %.2f",str, value);
+            }
+            PRINTOUT2("\n");
+            fflush(NULL);
+
+            if (overfull) {
+                PRINTERR("Buffer overrun!\n");
+                //ret = -1;
+                //break;
+            }
+            if (prog_exit) {
+                break;
+            }
+        } while (sample_count > 0);
+
+        if (!HATsensorDataFunction(&hatCtrl, 0, &value, str, &error)) {
+            PRINTOUT2("-> %s %.2f",str, value);
+        }
+        PRINTOUT2("\n");
+
+        // Stop streaming
+        HATstopDataStream(&hatCtrl);
+    }
+}*/
+
 
 /* ------------------------------------------------------------------------- */
 /** Main
@@ -168,14 +230,17 @@ void showSwitchStatus(struct hatCtrl *hatCtrl)
 int main(int argc, char **argv)
 {
     struct hatCtrl hatCtrl;
-    int error, i = 0, k = 0, ret = 0, param_error = 0, val = 0, val2 = 0, overfull,r;
-    double value,data[4][100];
-    char *endptr, str[MAX_STRING], data_str[4][MAX_STRING];
+    int error, i = 0, k = 0, ret = 0, param_error = 0, val = 0, val2 = 0, overfull,r,starttime;
+    double value;
+    char *endptr, str[MAX_STRING];
     struct streamConfig new_streamConfig;
     char *SerialNumber = NULL;
-    long sample_count;
+    long readSize;
+    struct HATdata HATdata[4];
+    unsigned long read_sets = 0;
 
     memset(&new_streamConfig,0,sizeof(struct streamConfig));
+    memset(&hatCtrl,0,sizeof(struct hatCtrl));
 
     // Default parameters
     new_streamConfig.samplerate = 100;
@@ -215,7 +280,9 @@ int main(int argc, char **argv)
         	}
         	if (!strcmp(argv[i],"--config_file") || !strcmp(argv[i],"-c")) {
                 if (argc > i+1) {
-                    HATreadSensorConfigFile(&hatCtrl,argv[i+1],&new_streamConfig);
+                    if ( (ret = HATreadSensorConfigFile(&hatCtrl,argv[i+1],&new_streamConfig)) != 0) {
+                        goto exit;
+                    }
                 }
                 else {
                     param_error = 1;
@@ -364,37 +431,42 @@ int main(int argc, char **argv)
 
     // Update digital IO
     HATsetOuts(&hatCtrl);
-    
-    // Start sensor(s) data streaming if needed.    
+
     if (!HATstartDataStream(&hatCtrl,&new_streamConfig)) {
-        sample_count = HATsamplesToRead(&hatCtrl);
-        if (sample_count == 0) {
-            sample_count = INT32_MAX;
-        }
+        read_sets = HATsamplesToRead(&hatCtrl);
+        readSize = 1;
+   
         do {
-            for (k = 0; k < HATsensors(&hatCtrl); k++) {
-                // Read one 1 value from specified channel
-                if ( (r = HATreadDataCh(&hatCtrl,k,data[k],1,data_str[k],&overfull)) > 0) {
-                    sample_count -= r;
+            starttime = getTickCount();
+            ret = 0;
+            do {
+                if ( (r = HATreadData(&hatCtrl,HATdata,readSize,&overfull, DATA_NO_WAIT)) > 0) {
+                    read_sets -= r;
                 }
-                else {
-                    PRINTERR("\nRead error!\n");
+                else if ( (starttime + DATA_TIME_OUT) < getTickCount()) {
+                    PRINTERR("\nRead Time out\n");
                     ret = -1;
                     break;
                 }
+                else {
+                    // Try again after some sleep.
+                    usleep(hatCtrl.shmem->streamConfig.time_between_samples);
+                }
+            } while (r == 0 && ret == 0 && read_sets > 0);
+            
+            // Print read values 
+            for (i = 0; i < r; i++) {
+                for (k = 0; k < HATsensors(&hatCtrl); k++) {
+                    if (HATdata[k].data[i] != NO_DATA) {
+                        PRINTOUT2("%5.2f %s  ",HATdata[k].data[i],HATdata[k].str);                
+                    }
+                    else {
+                        PRINTOUT2("    -    ");                
+                    }
+                }
+                PRINTOUT2("\n");
+                fflush(NULL);
             }
-
-            for (k = 0; k < HATsensors(&hatCtrl); k++) {
-                //printf("%5.1f %s  ",HATOpticalXYZtosRGB(data[0][0], data[1][0], data[2][0],k,255),data_str[k]);                
-                PRINTOUT2("%5.2f %s  ",data[k][0],data_str[k]);                
-            }
-
-            // Use function for read data. Function is specified in sensor config file
-            //if (!HATsensorDataFunction(&hatCtrl, 0, &value, str, &error)) {
-            //    PRINTOUT2("-> %s %.2f",str, value);
-            //}
-            PRINTOUT2("\n");
-            fflush(NULL);
 
             if (overfull) {
                 PRINTERR("Buffer overrun!\n");
@@ -404,10 +476,12 @@ int main(int argc, char **argv)
             if (prog_exit) {
                 break;
             }
-        } while (sample_count > 0);
+        } while (read_sets > 0);
 
-        if (!HATsensorDataFunction(&hatCtrl, 0, &value, str, &error)) {
-            PRINTOUT2("-> %s %.2f",str, value);
+        for (k = 0; k < HATsensors(&hatCtrl); k++) { 
+            if (!HATsensorDataFunction(&hatCtrl, k, &value, str, &error)) {
+                PRINTOUT2("-> %s %.2f",str, value);
+            }
         }
         PRINTOUT2("\n");
 

@@ -336,7 +336,7 @@ int main(int argc, char **argv)
 
         if (dataStreaming) {
             streamDataAndStore(hDevice, &streamSetup, shmem, &caliInfo, semshmem, &samples);
-            if (streamSetup.samples != 0 && (samples >= streamSetup.samples )) {
+            if (streamSetup.samples != 0 && (samples >= streamSetup.samples)) {
                 if (streamSetup.fhandle != NULL) {
                     fclose(streamSetup.fhandle);
                     streamSetup.fhandle = NULL;
@@ -390,7 +390,6 @@ int handleStreamConfig(struct streamSetup *streamSetup, struct streamConfig *str
     // TODO: Check that samplerate is valid
     streamSetup->samplerate = streamConfig->samplerate;
     streamSetup->samples = streamConfig->samples * streamSetup->numberOfChannels;
-
     streamSetup->readSizeMultiplier = 1;
 
     if (streamSetup->samplerate <= 20) {
@@ -449,8 +448,8 @@ int writeToFile(struct shmem *shmem, struct streamSetup *streamSetup, double val
     else {
         double conv_value = 0;
         char value_str[10];
-        convert(shmem, value, ch, &conv_value, value_str);
-        fprintf(fhandle,"%6.1f %s",conv_value, value_str);
+        convert(shmem, value, shmem->streamConfig.ch_table[ch], &conv_value, value_str);
+        fprintf(fhandle,"%5.2f %s  ",conv_value, value_str);
     }
     if (ch == (streamSetup->numberOfChannels-1) ) {
         fprintf(fhandle, "\n");
@@ -482,7 +481,7 @@ int streamDataAndStore(HANDLE hDevice, struct streamSetup *streamSetup, struct s
             }
 
             sem_wait(sem);
-            if (addToBuf(&shmem->ch_data[(i + start_ch) % streamSetup->numberOfChannels],(int)(nearbyint(dvolt*10))) < 0) {
+            if (addToBuf(&shmem->ch_data[(i + start_ch) % streamSetup->numberOfChannels],(int)(nearbyint(dvolt*100))) < 0) {
                 shmem->ch_data[(i + start_ch) % streamSetup->numberOfChannels].overfull = 1;
                 //printf("buf:full\n");
             }
@@ -496,7 +495,6 @@ int streamDataAndStore(HANDLE hDevice, struct streamSetup *streamSetup, struct s
     else {
         return -1;
     }
-
     streamSetup->start_ch = *samples % streamSetup->numberOfChannels;
 
     return i;

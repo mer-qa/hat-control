@@ -1,27 +1,27 @@
 #--------------------------------------------------------------
-# This is example configuration for HAT current sensor device.
+# This is example configuration for HAT optical3 sensor device.
 #
 #--------------------------------------------------------------
 
 [Common]
 Samplerate=10
-Samples=10
+Samples=500
 Datafile=
 
 [Sensor1]
-Type=Current
-Function=
-Samplerate=10
-String0=mA
+Type=Optical3
+Function=Optic_get_color
+Samplerate=5
+String0=RGB
 String1=
-Dout=1 # 0 = low range 0-100mA, 1 = high range 0-1500mA
-Offset=-0
-Multiplier0=1
-Multiplier1=1
+Dout=0 # No function for optical3 sensor
+Offset=0
+Multiplier0=0
+Multiplier1=0
 
 #[Sensor2]
-#Type=Current
-#Samplerate=10
+#Type=Optical
+#Samplerate=100
 #String0=G 
 #String1=G 
 #Dout=0
@@ -30,20 +30,20 @@ Multiplier1=1
 #Multiplier1=1
 
 #[Sensor3]
-#Type=Current
+#Type=Optical
 #Samplerate=10
-#String0= 
-#String1= 
+#String0=B 
+#String1=B 
 #Dout=0
 #Offset=0
 #Multiplier0=1
 #Multiplier1=1
 
 #[Sensor4]
-#Type=Current
-#Samplerate=10
-#String0=
-#String1=
+#Type=Audio
+#Samplerate=200
+#String0=mV
+#String1=mV
 #Dout=0
 #Offset=0
 #Multiplier0=1

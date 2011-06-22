@@ -4,17 +4,17 @@
 #--------------------------------------------------------------
 
 [Common]
-Samplerate=5
-Samples=10
+Samplerate=50
+Samples=100
+Datafile=
 
 [Sensor1]
-Type=Optical3
-Function=Optic_get_color
-Samplerate=5
-String0=RGB
+Type=Optical
+Function=Average
+Samplerate=50
+String0=
 String1=
-Dout=0 # No function for optical3 sensor
-Datafile=
+Dout=0 # Selects color channel 0 = X(R), 1 = Z(B) and 2 = B(G)
 Offset=0
 Multiplier0=0
 Multiplier1=0
@@ -25,7 +25,6 @@ Multiplier1=0
 #String0=G 
 #String1=G 
 #Dout=0
-#Datafile=
 #Offset=0
 #Multiplier0=1
 #Multiplier1=1
@@ -36,7 +35,6 @@ Multiplier1=0
 #String0=B 
 #String1=B 
 #Dout=0
-#Datafile=
 #Offset=0
 #Multiplier0=1
 #Multiplier1=1
@@ -47,7 +45,6 @@ Multiplier1=0
 #String0=mV
 #String1=mV
 #Dout=0
-#Datafile=
 #Offset=0
 #Multiplier0=1
 #Multiplier1=1

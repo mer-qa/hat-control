@@ -52,7 +52,6 @@
 
 // Driver communication parameters
 #define ANS_TIME_OUT    1000    //ms
-#define DATA_TIME_OUT   500     //ms
 
 // HW max samplerate
 #define MAX_SAMPLERATE  10000   //Hz
@@ -206,7 +205,7 @@ double resistanceToTemp(double res)
  */
 double voltageToTemp(double volt, int state)
 {
-    printf("vtor:%f    ",voltageToResistance(volt));
+    //printf("vtor:%f    ",voltageToResistance(volt));
     return resistanceToTemp(voltageToResistance(volt));
 }
 
@@ -232,15 +231,15 @@ int convert(struct shmem *shmem, double value, int ch, double *conv_value, char 
             *conv_value = sensor_params[sensor_type].convert( (double)value, shmem->ioctrl.sensorDigOutput[ch]);
         }
 
-        if (shmem->ioctrl.sensorDigOutput[ch]) {
-            dout = 1;
-            *conv_value += (sensor_params[sensor_type].offset[dout]);
-            *conv_value *= sensor_params[sensor_type].multiplier1;
+        if (shmem->ioctrl.sensorDigOutput[ch] >= 0 && shmem->ioctrl.sensorDigOutput[ch] <= 2) {
+            dout = shmem->ioctrl.sensorDigOutput[ch];
+            *conv_value += sensor_params[sensor_type].offset[dout];
+            *conv_value *= sensor_params[sensor_type].multiplier[dout];
         }
         else {
             dout = 0;
-            *conv_value += (sensor_params[sensor_type].offset[dout]);
-            *conv_value *= sensor_params[sensor_type].multiplier0;
+            *conv_value += sensor_params[sensor_type].offset[dout];
+            *conv_value *= sensor_params[sensor_type].multiplier[dout];
         }
 
         if (shmem->streamConfig.sensor[ch].offset_mult_order == OFFSET_FIRST) {
@@ -257,8 +256,8 @@ int convert(struct shmem *shmem, double value, int ch, double *conv_value, char 
     }
     else {
         *conv_value = 0xffff;
-        if (value_str != NULL) 
-            strcpy(value_str, "OVER!");
+        //if (value_str != NULL) 
+            //strcpy(value_str, "OVER!");
     }
 
     return 0;
@@ -272,7 +271,7 @@ int convert(struct shmem *shmem, double value, int ch, double *conv_value, char 
  * @param str latency string 
  * @return 0 success and -1 failure
  */
-int getLatency(struct hatCtrl *hatCtrl, unsigned int ch, double *value, char *str)
+int getLatency(struct hatCtrl *hatCtrl, unsigned int ch, double param[], double *value, char *str)
 {
     int i,k;
     double avg = 0, max[2], ret = 0;
@@ -314,7 +313,7 @@ int getLatency(struct hatCtrl *hatCtrl, unsigned int ch, double *value, char *st
  * @param str string for average value 
  * @return 0 success and -1 failure
  */
-int getAvg(struct hatCtrl *hatCtrl, unsigned int ch, double *value, char *str)
+int getAvg(struct hatCtrl *hatCtrl, unsigned int ch, double param[], double *value, char *str)
 {
     int i;
     double avg = 0;
@@ -334,6 +333,52 @@ int getAvg(struct hatCtrl *hatCtrl, unsigned int ch, double *value, char *str)
     return 0;
 }
 
+int checkLimits(struct hatCtrl *hatCtrl, unsigned int ch, double param[], double *value, char *str)
+{
+    int i;
+    double avg = 0;
+    struct sensor *sensor = &hatCtrl->shmem->streamConfig.sensor[ch];
+    //printf("\nch:%d  st:%d\n",ch,sensor->data_func.stored);
+    for (i = 0; i < sensor->data_func.stored; i++) {
+        //printf("i:%d->%f\n",i,sensor->data_func.fdata[i]);
+        if (sensor->data_func.fdata[i] > param[0]) {
+            *value = 1;
+            if (str != NULL) {
+                strncpy(str,"LIMIT",MAX_STRING);
+            }  
+        }
+    }
+    *value = avg;
+    sensor->data_func.stored = 0;
+    //printf("avg: %f\n",avg);
+
+    if (str != NULL) {
+        strncpy(str,"Average:",MAX_STRING);
+    }
+    return 0;
+}
+
+int getRms(struct hatCtrl *hatCtrl, unsigned int ch, double param[], double *value, char *str)
+{
+    int i;
+    double rms = 0;
+    struct sensor *sensor = &hatCtrl->shmem->streamConfig.sensor[ch];
+
+    for (i = 0; i < sensor->data_func.stored; i++) {
+        rms = sqrt( (i*rms*rms + sensor->data_func.fdata[i]*sensor->data_func.fdata[i]) / (i+1));
+    }
+    *value = rms;
+    sensor->data_func.stored = 0;
+
+    if (str != NULL) {
+        strncpy(str,"RMS:",MAX_STRING);
+    }
+    return 0;
+}
+
+
+
+
 /* ------------------------------------------------------------------------- */
 /** Calculates average value from data.
  * @param hatCtrl struct hatCtrl 
@@ -342,18 +387,21 @@ int getAvg(struct hatCtrl *hatCtrl, unsigned int ch, double *value, char *str)
  * @param str string for color 
  * @return 0 success and -1 failure
  */
-int getColor(struct hatCtrl *hatCtrl, unsigned int ch, double *value, char *str)
+int getColor(struct hatCtrl *hatCtrl, unsigned int ch, double param[], double *value, char *str)
 {
     double avg_cR, avg_cG, avg_cB;
-    getAvg(hatCtrl, 0, &avg_cR, NULL);
-    getAvg(hatCtrl, 1, &avg_cG, NULL);
-    getAvg(hatCtrl, 2, &avg_cB, NULL);
-
-    //printf("(%.2f %.2f %.2f)",avg_cR,avg_cG,avg_cB);
-
-    if (hatCtrl->shmem->streamConfig.sensors == 3) {
+    
+    //printf("ch:%d\n",ch);
+    if (hatCtrl->shmem->streamConfig.sensors >= 3) {
+        getAvg(hatCtrl, 0, NULL, &avg_cR, NULL);
+        getAvg(hatCtrl, 1, NULL, &avg_cG, NULL);
+        getAvg(hatCtrl, 2, NULL, &avg_cB, NULL);
+        //printf("(%.2f %.2f %.2f)",avg_cR,avg_cG,avg_cB);
         *value = HATOpticalDetectColor(hatCtrl, avg_cR,avg_cG,avg_cB, str);
         return 0;
+    }
+    else {
+        *value = 0xffff;
     }
     return -1;
 }
@@ -366,12 +414,12 @@ int getColor(struct hatCtrl *hatCtrl, unsigned int ch, double *value, char *str)
  * @param str string for average value 
  * @return 0 success and -1 failure
  */
-int getIntensity(struct hatCtrl *hatCtrl, unsigned int ch, double *value, char *str)
+int getIntensity(struct hatCtrl *hatCtrl, unsigned int ch, double param[], double *value, char *str)
 {
     double avg_cR, avg_cG, avg_cB;
-    getAvg(hatCtrl, 0, &avg_cR, NULL);
-    getAvg(hatCtrl, 1, &avg_cG, NULL);
-    getAvg(hatCtrl, 2, &avg_cB, NULL);
+    getAvg(hatCtrl, 0, NULL, &avg_cR, NULL);
+    getAvg(hatCtrl, 1, NULL, &avg_cG, NULL);
+    getAvg(hatCtrl, 2, NULL, &avg_cB, NULL);
 
     //printf("(%.2f %.2f %.2f)",avg_cR,avg_cG,avg_cB);
 
@@ -415,84 +463,127 @@ int HATsensors(struct hatCtrl *hatCtrl)
  */
 int HATsamplesToRead(struct hatCtrl *hatCtrl) 
 {
-    return hatCtrl->shmem->streamConfig.samples * HATsensors(hatCtrl);
+    return hatCtrl->shmem->streamConfig.MaxSamplesFromCh;
 }
+
 
 /* ------------------------------------------------------------------------- */
 /** Read data from shared memory
  * @param hatCtrl struct hatCtrl 
  * @param ch read channel 
- * @param data read data 
- * @param size read size 
- * @param str string of the data 
+ * @param value read value 
  * @param overfull overfull indicator 
- * @return 0 on success and -1 on failure
+ * @param mode DATA_NO_WAIT or DATA_WAIT
+ * @return 0 on success and negative on failure
  */
-int HATreadDataCh(struct hatCtrl *hatCtrl, int ch, double *data, long size, char *str, int *overfull)
+int readDataFromShBuf(struct hatCtrl *hatCtrl, int ch, int *value, int *overfull, int mode)
 {
-    int sample_count = 0, stored_count = 0, x = 0, ret = 0, starttime; 
-    double vals[MAX_SENSOR_INPUTS] = {0};
-    long avg[MAX_SENSOR_INPUTS] = {0};
-    long avg_count[MAX_SENSOR_INPUTS] = {0};
-    double con_val = 0;
-    unsigned int cch;
-
-    int avg_values = hatCtrl->shmem->streamConfig.samplerate / hatCtrl->shmem->streamConfig.sensor[hatCtrl->shmem->streamConfig.ch_table[ch]].samplerate;
+    int starttime = 0, ret;
 
     sem_wait(hatCtrl->semshmem);
-    *overfull = hatCtrl->shmem->ch_data[ch].overfull;
+    if (overfull) {
+        *overfull = hatCtrl->shmem->ch_data[ch].overfull;
+    }
     hatCtrl->shmem->ch_data[ch].overfull = 0;
     sem_post(hatCtrl->semshmem);
 
-    do {
+    if (mode == DATA_NO_WAIT) {
+        sem_wait(hatCtrl->semshmem);
+        ret = getFromBuf(&hatCtrl->shmem->ch_data[ch], value);
+        sem_post(hatCtrl->semshmem);
+    }
+    else {
+        starttime = getTickCount();
         do {
-            starttime = getTickCount();
-            do {
-                sem_wait(hatCtrl->semshmem);
-                ret = getFromBuf(&hatCtrl->shmem->ch_data[ch], &x);
-                sem_post(hatCtrl->semshmem);
-                if ( (starttime + DATA_TIME_OUT) < getTickCount()) {
-                    ret = -2;
-                    break;
-                }
-                else if (ret == -1) {
-                    //printf("d:%ld\n",hatCtrl->shmem->streamConfig.time_between_samples / 20);
-                    usleep(hatCtrl->shmem->streamConfig.time_between_samples);
-                }
+            sem_wait(hatCtrl->semshmem);
+            ret = getFromBuf(&hatCtrl->shmem->ch_data[ch], value);
+            sem_post(hatCtrl->semshmem);
+            if ( (starttime + DATA_TIME_OUT) < getTickCount()) {
+                ret = -2;
+                break;
             }
-            while ( ret < 0);
-    
-            if (ret == 0) {
-                //printf("ch: %d,  x:%d\n",ch,x);
-                sample_count++;
-                vals[ch] += (x - vals[ch]) / (avg_count[ch]+1);
-                if (++avg_count[ch] == avg_values) {
-                    avg_count[ch] = 0;
-                    avg[ch] = vals[ch];
-                    vals[ch] = 0;
-                }
+            else if (ret == -1) {
+                usleep(hatCtrl->shmem->streamConfig.time_between_samples);
             }
-        } while (ret != -2 && avg_count[ch]);
-            
-        if (ret != -2 && avg_count[ch] == 0) {
-            cch = hatCtrl->shmem->streamConfig.ch_table[ch];
-            convert(hatCtrl->shmem, avg[ch]/10, cch, &con_val, str);
-            data[stored_count++] = con_val;
-            if (/*hatCtrl->shmem->streamConfig.sensor[cch].data_func.function > 0 && */ hatCtrl->shmem->streamConfig.sensor[cch].data_func.fdata != NULL) {
-                hatCtrl->shmem->streamConfig.sensor[cch].data_func.fdata[hatCtrl->shmem->streamConfig.sensor[cch].data_func.stored++] = con_val;
-                //printf("cch:%d  val:%f\n",cch,con_val);
-            }
-        }
-        else {
-            data[stored_count++] = 0xffff;
-            if (str != NULL) {
-                strcpy(str,"err");
-            }
-            break;
-        }
-    } while ( (stored_count < size) && (sample_count < hatCtrl->shmem->streamConfig.samples || hatCtrl->shmem->streamConfig.samples == 0) );
+        } while ( ret < 0);
+    }
 
-    return stored_count;
+    return ret;
+}
+
+/* ------------------------------------------------------------------------- */
+/** Read data from shared memory
+ * @param hatCtrl struct hatCtrl 
+ * @param HATdata struct HATdata  
+ * @param size read size 
+ * @param str string of the data 
+ * @param overfull overfull indicator 
+ * @param mode DATA_NO_WAIT or DATA_WAIT
+ * @return how many bytes read
+ */
+int HATreadData(struct hatCtrl *hatCtrl, struct HATdata *HATdata, unsigned int size, int *overfull, int mode)
+{
+    int sample_count = 0, x = 0, ret = 0, i = 0;
+    int stored_count = 0, max_stored = 0; 
+    static double vals[MAX_SENSOR_INPUTS] = {0};
+    static long avg[MAX_SENSOR_INPUTS] = {0};
+    static long avg_count[MAX_SENSOR_INPUTS] = {0};
+    double con_val = 0;
+    unsigned int cch,ch;
+
+    int avg_values[4];
+
+    memset(HATdata,0,sizeof(struct HATdata) * 4);
+
+    do {
+        stored_count = 0;
+        sample_count = 0;
+        do {
+            // Check that all data buffer has atleast one data value.
+            if (mode == DATA_NO_WAIT) {
+                sem_wait(hatCtrl->semshmem);
+                for (ch = 0; ch < HATsensors(hatCtrl); ch++) {
+                    if (getBufSize(&hatCtrl->shmem->ch_data[ch]) == 0) {
+                        sem_post(hatCtrl->semshmem);
+                        return max_stored;
+                    }
+                }
+                sem_post(hatCtrl->semshmem);
+            }
+
+            for (ch = 0; ch < HATsensors(hatCtrl); ch++) {
+                HATdata[ch].data[i] = NO_DATA;
+                avg_values[ch] = hatCtrl->shmem->streamConfig.samplerate / hatCtrl->shmem->streamConfig.sensor[hatCtrl->shmem->streamConfig.ch_table[ch]].samplerate;
+    
+                ret = readDataFromShBuf(hatCtrl, ch, &x, overfull, DATA_WAIT);
+                if (ret == 0) {
+                    sample_count++;
+                    vals[ch] += (x - vals[ch]) / (avg_count[ch]+1);
+                    if (++avg_count[ch] == avg_values[ch]) {
+                        avg_count[ch] = 0;
+                        avg[ch] = vals[ch];
+                        vals[ch] = 0;
+                        cch = hatCtrl->shmem->streamConfig.ch_table[ch];
+                        convert(hatCtrl->shmem, (double)(avg[ch])/100, cch, &con_val, HATdata[ch].str);
+                        HATdata[ch].data[i] = con_val;
+                        HATdata[ch].size++;
+                        if(HATdata[ch].size > max_stored) {
+                            max_stored = HATdata[ch].size; 
+                        }
+                        stored_count++;
+                        if (/*hatCtrl->shmem->streamConfig.sensor[cch].data_func.function > 0 && */ hatCtrl->shmem->streamConfig.sensor[cch].data_func.fdata != NULL) {
+                            hatCtrl->shmem->streamConfig.sensor[cch].data_func.fdata[hatCtrl->shmem->streamConfig.sensor[cch].data_func.stored++] = con_val;
+                        }
+                    }
+                }
+                else {
+                    break;       
+                }
+            }
+        } while ( ret == 0 && !stored_count && (sample_count < hatCtrl->shmem->streamConfig.samples || hatCtrl->shmem->streamConfig.samples == 0) );
+    } while (++i < size && ret == 0);
+    
+    return max_stored;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -554,15 +645,21 @@ int HATpresetSensorIO(struct hatCtrl *hatCtrl, int ch, int state)
  * @param state switch state 
  * @return 0 on success and -1 on failure
  */
-int HATpresetSwitchState(struct hatCtrl *hatCtrl, int sw_bit, int state)
+int HATpresetSwitchState(struct hatCtrl *hatCtrl, int bit, int state)
 {
     int ret = 0;
     sem_wait(hatCtrl->semshmem);
     if (state == 0) { 
-        hatCtrl->shmem->streamConfig.digout &= ~(1 << sw_bit);
+        hatCtrl->shmem->streamConfig.digout &= ~(1 << bit);
+        hatCtrl->shmem->streamConfig.digdir &= ~(1 << bit);
     }
     else if (state == 1) {
-        hatCtrl->shmem->streamConfig.digout |= (1 << sw_bit);
+        hatCtrl->shmem->streamConfig.digout |= (1 << bit);
+        hatCtrl->shmem->streamConfig.digdir &= ~(1 << bit);
+    }
+    else if (state == 2) {
+        hatCtrl->shmem->streamConfig.digout &= ~(1 << bit);
+        hatCtrl->shmem->streamConfig.digdir |= (1 << bit);
     }
     else if (state == 3) {
         hatCtrl->shmem->streamConfig.digout |= PWR_USB_IOS;
@@ -574,7 +671,7 @@ int HATpresetSwitchState(struct hatCtrl *hatCtrl, int sw_bit, int state)
         ret = -1;
     }
     sem_post(hatCtrl->semshmem);
-    return 0;
+    return ret;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -600,7 +697,7 @@ int HATcloseDrvControl(struct hatCtrl *hatCtrl)
 {
     int ch;
     for (ch = 0; ch < MAX_SENSOR; ch++) {
-        if (hatCtrl->shmem->streamConfig.sensor[ch].data_func.fdata != NULL) {
+        if (hatCtrl->shmem != NULL && hatCtrl->shmem->streamConfig.sensor[ch].data_func.fdata != NULL) {
             free(hatCtrl->shmem->streamConfig.sensor[ch].data_func.fdata);
             memset(&hatCtrl->shmem->streamConfig.sensor[ch],0,sizeof(struct sensor));
         }
@@ -683,20 +780,32 @@ int HATprocessStreamConfig(struct streamConfig *streamConfig)
     int k, ret = 0;
 
     streamConfig->sensors = 0;
+    streamConfig->MaxSamplesFromCh = 0;
+    if (streamConfig->samples == 0) {
+        streamConfig->samples = INT_MAX;
+    }
+
     for (k = 0; k < MAX_SENSOR; k++) {
         if (streamConfig->sensor[k].type) {
             streamConfig->ch_table[streamConfig->sensors++] = k;
+            if (streamConfig->sensor[k].type == 5) {
+                streamConfig->sensors +=2;
+            }
             if (streamConfig->sensor[k].samplerate == 0) {
                 streamConfig->sensor[k].samplerate = streamConfig->samplerate;
             }
             if ( ((streamConfig->samplerate % streamConfig->sensor[k].samplerate) != 0)) {
-                PRINTERR("Sensor %d samplerate needs to be multiple with common samplerate\n",k);
+                PRINTERR("Sensor %d samplerate needs to be multiple with common samplerate\n",k+1);
                 PRINTERR("and lower than common samplerate.\n");
                 ret = -1;
                 break;
             }
-            if (streamConfig->sensor[k].data_func.function > 0 && streamConfig->samples > 0) {
-                streamConfig->sensor[k].data_func.size = streamConfig->samples / (streamConfig->samplerate / streamConfig->sensor[k].samplerate);
+            if ( (streamConfig->samples/(streamConfig->samplerate / streamConfig->sensor[k].samplerate) > streamConfig->MaxSamplesFromCh)) {
+                streamConfig->MaxSamplesFromCh = streamConfig->samples/(streamConfig->samplerate / streamConfig->sensor[k].samplerate);
+            }
+            //streamConfig->samplesToRead += streamConfig->samples/(streamConfig->samplerate / streamConfig->sensor[k].samplerate);
+            if (streamConfig->sensor[k].data_func.function > 0 && streamConfig->samples != INT_MAX) {
+                streamConfig->sensor[k].data_func.size = streamConfig->samples / (streamConfig->samplerate / streamConfig->sensor[k].samplerate) + 1;
                 streamConfig->sensor[k].data_func.fdata = malloc(streamConfig->sensor[k].data_func.size * sizeof(double));
                 if (streamConfig->sensor[k].data_func.fdata == NULL) {
                     PRINTERR("Memory allocation error\n");
@@ -714,12 +823,16 @@ int HATprocessStreamConfig(struct streamConfig *streamConfig)
             if (streamConfig->sensor[k].mult_mv[1] == 0) {
                 streamConfig->sensor[k].mult_mv[1] = 1;
             }
+            if (streamConfig->sensor[k].mult_mv[2] == 0) {
+                streamConfig->sensor[k].mult_mv[2] = 1;
+            }
         }
     }
     
     if (streamConfig->sensor[0].type == 5 /*optical3*/) {
         streamConfig->ch_table[1] = 1;
         streamConfig->ch_table[2] = 2;
+        //streamConfig->samplesToRead *= 3; 
         memcpy(&streamConfig->sensor[1],&streamConfig->sensor[0], sizeof(struct sensor));
         memcpy(&streamConfig->sensor[2],&streamConfig->sensor[0], sizeof(struct sensor));
         if (strlen(streamConfig->sensor[0].str[0]) > 2) {
@@ -744,16 +857,18 @@ int HATprocessStreamConfig(struct streamConfig *streamConfig)
             streamConfig->sensor[k].data_func.fdata = NULL;
             streamConfig->sensor[k].data_func.size = 0;
         }
-
-        streamConfig->sensors = 3;
     }
-
     // This time is used to sleep when waiting data to buffer.
     streamConfig->time_between_samples = 1000000 / streamConfig->samplerate;
 
     if ( (streamConfig->samplerate * streamConfig->sensors) > MAX_SAMPLERATE) {
         PRINTERR("Samplerate too high. Reduce samplerate or used channels.\n");
         PRINTERR("Maximum samplerate is 10000Hz divided by channels in use.\n");
+        ret = -1;
+    }
+    else if (streamConfig->MaxSamplesFromCh == 0 && streamConfig->sensors) {
+        PRINTERR("The ratio of the common and sensor samplerate needs more samples.\n");
+        PRINTERR("Samples=%ld is not enough.\n", streamConfig->samples);
         ret = -1;
     }
     return ret;
@@ -769,31 +884,38 @@ int HATstartDataStream(struct hatCtrl *hatCtrl, struct streamConfig *new_streamC
 {
     int ret = 0;
     
-    if ((ret = HATprocessStreamConfig(new_streamConfig))) {
-        ret = -1;
-        goto exit;
-    }
-
-    if (new_streamConfig->sensors) {
-        if (hatCtrl->shmem->streamConfig.hat_ctrl_pid != 0) {
-            PRINTERR("Error only one process can stream data. Stop previous streaming first.\n");
+    if (new_streamConfig != NULL) {
+        if ((ret = HATprocessStreamConfig(new_streamConfig))) {
             ret = -1;
             goto exit;
         }
-        sem_wait(hatCtrl->semshmem);
-        // Copy stream config to shared memory
-        memcpy(&hatCtrl->shmem->streamConfig, new_streamConfig, sizeof(struct streamConfig));
-        // Store control SW pid to shared memory
-        hatCtrl->shmem->streamConfig.hat_ctrl_pid = getpid();
-        hatCtrl->time = 0;
-        sem_post(hatCtrl->semshmem);
-        
+
+        if (new_streamConfig->sensors) {
+            if (hatCtrl->shmem->streamConfig.hat_ctrl_pid != 0) {
+                PRINTERR("Error only one process can stream data. Stop previous streaming first.\n");
+                ret = -1;
+                goto exit;
+            }
+            sem_wait(hatCtrl->semshmem);
+            // Copy stream config to shared memory
+            memcpy(&hatCtrl->shmem->streamConfig, new_streamConfig, sizeof(struct streamConfig));
+            // Store control SW pid to shared memory
+            hatCtrl->shmem->streamConfig.hat_ctrl_pid = getpid();
+            hatCtrl->time = 0;
+            sem_post(hatCtrl->semshmem);
+            
+            // Stop previous streaming
+            sendCmdToDrv(hatCtrl, STOP_STREAMING);
+            ret = sendCmdToDrv(hatCtrl, START_STREAMING);
+        }
+        else {
+            ret = -1;
+        }
+    }
+    else {
         // Stop previous streaming
         sendCmdToDrv(hatCtrl, STOP_STREAMING);
         ret = sendCmdToDrv(hatCtrl, START_STREAMING);
-    }
-    else {
-        ret = -1;
     }
 exit:
     return ret;
@@ -838,11 +960,11 @@ double HATOpticalXYZtosRGB(double cX, double cY, double cZ, int c, int range)
 int HATOpticalDetectColor(struct hatCtrl *hatCtrl, double cX, double cY, double cZ, char *str)
 {
     int i = -1, k = 0;
-    double avg = (cX + cY + cZ*2) / 3;
-    int dif[3] = {5.0, 2.2, 2.1};
-    double colors[] = {cX, cY, cZ*2};
+    double avg = (cX + cY + cZ*1.9) / 3;
+    int dif[3] = {3.1, 2.6, 2.1};
+    double colors[] = {cX, cY, cZ*1.9};
     //printf("avg:%0.2f  ",avg);
-    //printf("%0.2f  %0.2f  %0.2f  ",cX,cY,cZ);
+    //printf("%0.2f  %0.2f  %0.2f  ",colors[0],colors[1],colors[2]);
 
     while(k < 3) {
         if ( (colors[k] - avg) > dif[k] ) {
@@ -852,7 +974,7 @@ int HATOpticalDetectColor(struct hatCtrl *hatCtrl, double cX, double cY, double 
     }
         
     if (i == -1) {
-        if (avg > 25) {
+        if (avg > 20) {
             i = 3;
         }
         if (avg < 5) {
@@ -899,8 +1021,8 @@ int HATsensorDataFunction(struct hatCtrl *hatCtrl, int ch, double *value, char *
 {
     struct streamConfig *streamConfig = &hatCtrl->shmem->streamConfig;
     memset(str,0,MAX_STRING);
-    if (streamConfig->sensor[ch].data_func.function > 0 && streamConfig->samples != 0) {
-        *error = data_func_array[streamConfig->sensor[ch].data_func.function].data_function(hatCtrl, ch, value, str);
+    if (streamConfig->sensor[ch].data_func.function > 0 && streamConfig->samples != INT_MAX) {
+        *error = data_func_array[streamConfig->sensor[ch].data_func.function].data_function(hatCtrl, ch, streamConfig->sensor[ch].data_func.params, value, str);
         return 0;
     }
     return -1;
@@ -908,13 +1030,13 @@ int HATsensorDataFunction(struct hatCtrl *hatCtrl, int ch, double *value, char *
 
 
 const char *main_keys[] = {"Common","Sensor1","Sensor2","Sensor3","Sensor4",NULL};
-const char *common_keys[] = {"Samplerate","Samples",NULL};
+const char *common_keys[] = {"Samplerate","Samples","Datafile",NULL};
 
-const char *sensor_keys[] = {"Type","String0","String1","Samplerate","Dout","Datafile","Offset","Multiplier0","Multiplier1","Function",NULL};
+const char *sensor_keys[] = {"Type","String0","String1","Samplerate","Dout","Offset","Multiplier0","Multiplier1","Function",NULL};
 
-const char *sensor_types[] = {"None", "Voltage", "Current", "Temperature", "Audio", "Optical3", NULL};
+const char *sensor_types[] = {"None", "Voltage", "Current", "Temperature", "Audio", "Optical3","Optical","Acceleration", NULL};
 
-const char *data_functions[] = {"Audio_latency","Average","Optic_get_color", NULL};
+const char *data_functions[] = {"Audio_latency","Average","Optic_get_color","Limit","Rms", NULL};
 
 /* ------------------------------------------------------------------------- */
 /** Read sensor confugration file and store data to streamConfig struct
@@ -960,6 +1082,13 @@ int HATreadSensorConfigFile(struct hatCtrl *hatCtrl, char *filename, struct stre
                 }
                 streamConfig->samples = (unsigned int)v;                
             }
+            if (!strcmp(common_keys[i],"Datafile")) {
+                //strncpy(streamConfig->sensor[k-1].pathFilename, val, 254);
+                //printf("file->%s\n",streamConfig->sensor[k-1].pathFilename);
+                strncpy(streamConfig->pathFilename, val, 254);
+
+            }
+
         }
         error = NULL;
         i++;
@@ -983,7 +1112,7 @@ int HATreadSensorConfigFile(struct hatCtrl *hatCtrl, char *filename, struct stre
                         }
                         j++;
                     }
-                    if (sensor_types[k-1] == NULL) {
+                    if (sensor_types[j] == NULL) {
                         printf("Sensor type parsing error\n");
                         goto error;
                     }
@@ -991,8 +1120,12 @@ int HATreadSensorConfigFile(struct hatCtrl *hatCtrl, char *filename, struct stre
                 if (!strcmp(sensor_keys[i],"Function")) {
                     j = 0;
                     while (data_functions[j] != NULL) {
-                        if (val != NULL && !strcmp(val, data_functions[j])) {
+                        char function[20];
+                        sscanf(val,"%s %lf %lf",function,&streamConfig->sensor[k-1].data_func.params[0],&streamConfig->sensor[k-1].data_func.params[1]);
+                        //printf("f:%s  %lf %lf\n",function,streamConfig->sensor[k-1].data_func.params[0],streamConfig->sensor[k-1].data_func.params[1]);
+                        if (val != NULL && !strcmp(function, data_functions[j])) {
                             streamConfig->sensor[k-1].data_func.function = j+1;
+                            //printf("hep:%d\n",j);
                             break;
                         }
                         j++;
@@ -1001,12 +1134,6 @@ int HATreadSensorConfigFile(struct hatCtrl *hatCtrl, char *filename, struct stre
                         printf("Function doesn't found\n");
                         goto error;
                     }
-                }
-                if (!strcmp(sensor_keys[i],"Datafile")) {
-                    strncpy(streamConfig->sensor[k-1].pathFilename, val, 254);
-                    //printf("file->%s\n",streamConfig->sensor[k-1].pathFilename);
-                    strncpy(streamConfig->pathFilename, val, 254);
-
                 }
                 if (!strcmp(sensor_keys[i],"String0")) {
                     strncpy(streamConfig->sensor[k-1].str[0],val,10);
@@ -1053,6 +1180,17 @@ int HATreadSensorConfigFile(struct hatCtrl *hatCtrl, char *filename, struct stre
                         streamConfig->sensor[k-1].offset_mult_order = MULTIPLE_FIRST;
                     }
                     streamConfig->sensor[k-1].mult_mv[1] = dval;
+                }
+                if (!strcmp(sensor_keys[i],"Multiplier2")) {
+                    dval = strtold(val ,&endptr);
+                    if (*endptr != '\0' && *endptr != '*') {
+                        PRINTERR("Config parsing error (%s)\n",sensor_keys[i]);
+                        goto error;
+                    }
+                    if (endptr[0] == '*' || streamConfig->sensor[k-1].offset_mult_order == 0) {
+                        streamConfig->sensor[k-1].offset_mult_order = MULTIPLE_FIRST;
+                    }
+                    streamConfig->sensor[k-1].mult_mv[2] = dval;
                 }
                 if (!strcmp(sensor_keys[i],"Dout")) {
                     v = strtoul(val ,&endptr, 10);

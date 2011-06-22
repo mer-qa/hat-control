@@ -63,6 +63,7 @@ struct data_function {
     unsigned int function;
     unsigned int size;
     double *fdata;
+    double params[3];
     unsigned int stored;
 };
 
@@ -72,7 +73,7 @@ struct data_function {
 struct sensor {
     unsigned int type;
     int offset_mv;
-    int mult_mv[2];
+    int mult_mv[3];
     int offset_mult_order;
     char str[2][10];
     int samplerate;
@@ -87,6 +88,7 @@ struct streamConfig {
     unsigned int samplerate;
     char pathFilename[255];
     unsigned long samples;
+    unsigned long MaxSamplesFromCh;
     pid_t hat_ctrl_pid;
     long digout;
     long digdir;

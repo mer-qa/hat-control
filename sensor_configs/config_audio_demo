@@ -4,28 +4,27 @@
 #----------------------------------------------------
 
 [Common]
-Samplerate=8000
-Samples=16000
+Samplerate=4000
+Samples=100
+Datafile=
 
 [Sensor1]
 Type=Audio
-Function=#Audio_latency
-Samplerate=8000
+Function=Rms
+Samplerate=4000
 String0=
 String1=
 Dout=0 # 0 = left input, 1 = right input
-Datafile=
 Offset=0
 Multiplier0=1
 Multiplier1=1
 
 #[Sensor2]
-#Type=Audio
-#Samplerate=2000
+#Type=Voltage
+#Samplerate=4000
 #String0= 
 #String1= 
 #Dout=0
-#Datafile=
 #Offset=
 #Multiplier0=1
 #Multiplier1=1
@@ -36,7 +35,6 @@ Multiplier1=1
 #String0=
 #String1=
 #Dout=0
-#Datafile=
 #Offset=0
 #Multiplier0=1
 #Multiplier1=1
@@ -47,7 +45,6 @@ Multiplier1=1
 #String0=
 #String1=
 #Dout=0
-#Datafile=
 #Offset=0
 #Multiplier0=1
 #Multiplier1=1
