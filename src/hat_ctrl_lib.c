@@ -56,10 +56,20 @@
 // HW max samplerate
 #define MAX_SAMPLERATE  10000   //Hz
 
-// Temperature sensor parameters
+
+#define V2_SENSOR   // Use V2.0 temp sesnsor parameteres
+
+// Temperature sensor parameters V1.0
 #define CURR            0.99517629  //mA
 #define R13             1000.0      //ohm
 #define GAIN            6.1
+
+// Temperature sensor parameters V2.0
+#define CURR_2          0.0010800   //mA
+#define R14_2           1000.0      //ohm
+#define R13_2           1000.0      //ohm
+#define R12_2           1000.0      //ohm
+#define GAIN_2          24.1818
 
 // Parameters for audio latency calculation
 #define IGNORE_TIME     0.040   //s
@@ -183,8 +193,12 @@ float GetPt100Temperature(float r)
  */
 double voltageToResistance(double volt)
 {
-    volt = volt / 1000; 
-    return (volt + GAIN*CURR/1000*R13)/(GAIN*CURR/1000);
+    volt = volt / 1000 / GAIN_2; 
+    #ifdef V2_SENSOR
+        return ((R12_2*volt+CURR_2*R13_2*R14_2+R13_2*volt+R14_2*volt)/(CURR_2*R12_2-volt));
+    #else
+        return (volt + GAIN*CURR/1000*R13)/(GAIN*CURR/1000);
+    #endif
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1034,7 +1048,7 @@ const char *common_keys[] = {"Samplerate","Samples","Datafile",NULL};
 
 const char *sensor_keys[] = {"Type","String0","String1","Samplerate","Dout","Offset","Multiplier0","Multiplier1","Function",NULL};
 
-const char *sensor_types[] = {"None", "Voltage", "Current", "Temperature", "Audio", "Optical3","Optical","Acceleration", NULL};
+const char *sensor_types[] = {"None", "Voltage", "Current", "Temperature", "Audio", "Optical3","Optical","Acceleration","Acceleration6g", NULL};
 
 const char *data_functions[] = {"Audio_latency","Average","Optic_get_color","Limit","Rms", NULL};
 

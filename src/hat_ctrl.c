@@ -254,6 +254,11 @@ int main(int argc, char **argv)
         ret = 0;
         goto exit;
     }
+    if (argc == 2 && !strcmp(argv[1],"--version")) {
+        PRINTOUT2("%s\n",SW_VERSION);
+        ret = 0;
+        goto exit;
+    }
 
     // Get SerialNumber
     if (argc > 1) {
@@ -291,10 +296,6 @@ int main(int argc, char **argv)
             }
             else if (!strcmp(argv[i],"--serial")) {
                 PRINTOUT2("%lX\n",hatCtrl.shmem->serialNumber);
-                break;
-            }
-            else if (!strcmp(argv[i],"--version")) {
-                PRINTOUT2("%s\n",SW_VERSION);
                 break;
             }
             else if (!strcmp(argv[i],"-s") && argc > (i+1)) {

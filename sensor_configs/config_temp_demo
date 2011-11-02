@@ -4,8 +4,8 @@
 #----------------------------------------------------
 
 [Common]
-Samplerate=5
-Samples=10
+Samplerate=100
+Samples=100
 Datafile=
 
 [Sensor1]
@@ -14,7 +14,7 @@ Function=Average
 Samplerate=
 String0=C 
 String1=C 
-Dout=1 # 0 = input 1, 1 = input 2
+Dout=0 # 0 = input 1, 1 = input 2
 Offset=0
 Multiplier0=1
 Multiplier1=1

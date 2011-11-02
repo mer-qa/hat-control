@@ -99,7 +99,8 @@ static const struct senparams sensor_params[] = {{ {1,                   1,     
                                                  { {1,                   1,                   1                }, {-1238,-1238,  -1238},  NULL           }, // Audio
                                                  { {-0.10537,           -0.10537,            -0.10537          }, {-2424,-2424,  -2424},  NULL           }, // Optical3
                                                  { {-0.10625,           -0.10625,            -0.10625          }, {-2424,-2424,  -2424},  NULL           }, // Optical
-                                                 { {1,                   1,                   1                }, {-1234-1238,  -1238},  NULL           }, // Acceleration
+                                                 { {1.65,                1.65,                1.65             }, {-1250,-1250,  -1250},  NULL           }, // Acceleration 1.5G
+                                                 { {6.40776699,          6.40776699,          6.40776699       }, {-1250,-1250,  -1250},  NULL           }, // Acceleration 6.0G
                                                  { {1,                   1,                   1                }, {    0,    0,       },  NULL           }};
 
 int convert(struct shmem *shmem, double value, int ch, double *conv_value, char *value_str);
