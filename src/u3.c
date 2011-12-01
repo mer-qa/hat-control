@@ -25,6 +25,7 @@
 
 #include "u3.h"
 #include <stdlib.h>
+#include <time.h>
 
 
 u3CalibrationInfo U3_CALIBRATION_INFO_DEFAULT = {
@@ -237,11 +238,9 @@ void closeUSBConnection(HANDLE hDevice)
 
 long getTickCount()
 {
-    struct timeval tv;
-
-    gettimeofday(&tv, NULL);
-
-    return (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+    struct timespec tp;    
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+    return (tp.tv_sec * 1000) + (tp.tv_nsec / 1000000);
 }
 
 

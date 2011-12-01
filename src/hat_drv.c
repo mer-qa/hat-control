@@ -170,7 +170,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	//sem_unlink(SHMEMNAME);
+	sem_unlink(SHMEMNAME);
 	semshmem = sem_open(SHMEMNAME, O_CREAT | O_EXCL, 0644, 1);
 
     if(semshmem == SEM_FAILED) {
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
         goto done;
     }
 
-    //sem_unlink(COMMSEM);
+    sem_unlink(COMMSEM);
     semcomm = sem_open(COMMSEM, O_CREAT | O_EXCL, 0644, 1);
 
     if(semcomm == SEM_FAILED) {

@@ -23,7 +23,7 @@
 #ifndef HATDRVH
 #define HATDRVH
 
-#define SW_VERSION "0.4"
+#define SW_VERSION "0.5"
 
 // Maximun input voltge
 #define MAX_VALUE   2452
