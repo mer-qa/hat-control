@@ -74,6 +74,8 @@ const char usage[] = {
                "  -usb2pwr=[on|off]        Switch usb 2 power line on or off\n"
                "  -usb1data=[on|off]       Switch usb 1 data lines on or off\n"
                "  -usb2data=[on|off]       Switch usb 2 data lines on or off\n"
+               "  -usb1chr=[on|off]        Switch usb 1 charger resistor (overrides usb data)\n"
+               "  -usb2chr=[on|off]        Switch usb 2 charger resistor (overrides usb data)\n"
                "  -pwr1=[on|off]           Switch power 1 output on or off\n"
                "  -pwr2=[on|off]           Switch power 2 output on or off\n"
                "  -sio1=[on|off|hiz]       Set sensor 1 digital line\n"
@@ -121,6 +123,10 @@ const struct io_cmd io_command[] =  {{"-usb1pwr=on",     USB_PWR_1,       ON},
                                      {"-usb1data=off",   USB_DATA_1,      OFF},
                                      {"-usb2data=on",    USB_DATA_2,      ON},
                                      {"-usb2data=off",   USB_DATA_2,      OFF},
+                                     {"-usb1chr=on",     USB_CHR_1,       ON},
+                                     {"-usb1chr=off",    USB_CHR_1,       OFF},
+                                     {"-usb2chr=on",     USB_CHR_2,       ON},
+                                     {"-usb2chr=off",    USB_CHR_2,       OFF},
                                      {"-pwr1=on",        DC_POWER_SHDN1,  ON},
                                      {"-pwr1=off",       DC_POWER_SHDN1,  OFF},
                                      {"-pwr2=on",        DC_POWER_SHDN2,  ON},
@@ -254,6 +260,11 @@ int main(int argc, char **argv)
         ret = 0;
         goto exit;
     }
+    if (argc == 2 && !strcmp(argv[1],"--version")) {
+        PRINTOUT2("%s\n",SW_VERSION);
+        ret = 0;
+        goto exit;
+    }
 
     // Get SerialNumber
     if (argc > 1) {
@@ -291,10 +302,6 @@ int main(int argc, char **argv)
             }
             else if (!strcmp(argv[i],"--serial")) {
                 PRINTOUT2("%lX\n",hatCtrl.shmem->serialNumber);
-                break;
-            }
-            else if (!strcmp(argv[i],"--version")) {
-                PRINTOUT2("%s\n",SW_VERSION);
                 break;
             }
             else if (!strcmp(argv[i],"-s") && argc > (i+1)) {

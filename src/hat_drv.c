@@ -170,7 +170,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	//sem_unlink(SHMEMNAME);
+	sem_unlink(SHMEMNAME);
 	semshmem = sem_open(SHMEMNAME, O_CREAT | O_EXCL, 0644, 1);
 
     if(semshmem == SEM_FAILED) {
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
         goto done;
     }
 
-    //sem_unlink(COMMSEM);
+    sem_unlink(COMMSEM);
     semcomm = sem_open(COMMSEM, O_CREAT | O_EXCL, 0644, 1);
 
     if(semcomm == SEM_FAILED) {
@@ -508,8 +508,9 @@ int updateIO(HANDLE hDevice, sem_t *sem, struct shmem *shmem)
         PRINTERR("PortDirWrite error: %ld\n",error);
     }
 
-    // USB_DATA switches are inverted
-    if((error = maskDO(hDevice, ~(shmem->ioctrl.digdir),shmem->ioctrl.iostate ^ ((1 << USB_DATA_1) | (1 << USB_DATA_2)))) != 0) {
+    // USB_DATA and USB_CHR switches are inverted
+    if((error = maskDO(hDevice, ~(shmem->ioctrl.digdir),
+                       shmem->ioctrl.iostate ^ ((1 << USB_DATA_1) | (1 << USB_DATA_2) | (1 << USB_CHR_1 ) | (1 << USB_CHR_2)))) != 0) {
         PRINTERR("Error setting IO: %d\n",(int)error);
     }
     else {

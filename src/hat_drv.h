@@ -23,7 +23,7 @@
 #ifndef HATDRVH
 #define HATDRVH
 
-#define SW_VERSION "0.3"
+#define SW_VERSION "0.7"
 
 // Maximun input voltge
 #define MAX_VALUE   2452
@@ -67,6 +67,8 @@ static const int ach[] = {AI0, AI1, AI2, AI3};
 #define USB_PWR_2       15
 #define DC_POWER_SHDN1  16
 #define DC_POWER_SHDN2  17
+#define USB_CHR_1       18 // USB data line resistor switch
+#define USB_CHR_2       19
 
 #define PWR_USB_IOS     ((1 << USB_DATA_1) | (1 << USB_DATA_2) | (1 << USB_PWR_1) | (1 << USB_PWR_2) | (1 << DC_POWER_SHDN1) | (1 << DC_POWER_SHDN2))
 #define SENSOR_IOS      ((1 << AN0_IO) | (1 << AN1_IO) | (1 << AN2_IO) | (1 << AN3_IO))
