@@ -1,4 +1,4 @@
-COMMON_CFLAGS = -Wall -O2 -I/usr/include/glib-2.0 -I/usr/lib/glib-2.0/include
+COMMON_CFLAGS = -Wall -O2 -I/usr/include/glib-2.0 -I/usr/lib/glib-2.0/include -I/usr/lib64/glib-2.0/include -I/usr/lib/i386-linux-gnu/glib-2.0/include
 
 lib_LTLIBRARIES = libhatcontrol.la
 
