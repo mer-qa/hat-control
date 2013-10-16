@@ -50,10 +50,11 @@ rm -rf %{buildroot}
 %defattr(-,root,root)
 %doc hat-control/COPYING
 %{_bindir}/*
-%{_libdir}/*.so
+%{_libdir}/*.so.*
 
 %files devel
 %defattr(-,root,root)
 %doc hat-control/INSTALL
 %{_includedir}/*
 %{_libdir}/pkgconfig/*
+%{_libdir}/*.so
