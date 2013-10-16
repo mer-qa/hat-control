@@ -14,6 +14,15 @@ BuildRequires:  liblabjackusb-devel
 %description
 Control for hardware accessory for testing.
 
+%package devel
+Summary:        Development files for %{name}
+Group:          Development/Libraries/Other
+Requires:       %{name} = %{version}-%{release}
+
+%description devel
+The %{name}-devel package contains header files and examples for developing
+applications that use %{name}.
+
 %prep
 %setup -q
 cd hat-control
@@ -28,16 +37,23 @@ make %{?jobs:-j%jobs}
 %install
 cd hat-control
 %make_install
+rm -rf %{buildroot}/usr/lib/libhatcontrol.la
 
 %clean
 rm -rf %{buildroot}
 
-%post
-/sbin/ldconfig
+%post -p /sbin/ldconfig
 
 %postun -p /sbin/ldconfig
 
 %files
 %defattr(-,root,root)
-%doc hat-control/COPYING 
-%{_libdir}/*.so.*
+%doc hat-control/COPYING
+%{_bindir}/*
+%{_libdir}/*.so
+
+%files devel
+%defattr(-,root,root)
+%doc hat-control/INSTALL
+%{_includedir}/*
+%{_libdir}/pkgconfig/*
