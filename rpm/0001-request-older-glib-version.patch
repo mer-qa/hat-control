@@ -1,0 +1,11 @@
+diff -Naur a/configure.ac b/configure.ac
+--- a/configure.ac	2013-10-16 09:37:41.991398906 +0300
++++ b/configure.ac	2013-10-16 09:38:06.191398013 +0300
+@@ -8,6 +8,6 @@
+ 	libhatcontrol.pc
+ 	])
+ PKG_CHECK_MODULES([DEPS], [
+- glib-2.0 >= 2.24.1
++ glib-2.0 >= 2.22.1
+ ])
+ AC_OUTPUT
