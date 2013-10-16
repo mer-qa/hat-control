@@ -6,6 +6,7 @@ Group:          Hardware/Other
 License:        LGPL
 URL:            http://wiki.meego.com/Quality/QA-tools/hat-control
 Source0:        %{name}-%{version}.tar.gz
+Patch0001:      0001-request-older-glib-version.patch
 BuildRequires:  libusb1-devel
 BuildRequires:  glib2-devel
 BuildRequires:  liblabjackusb-devel
@@ -15,6 +16,8 @@ Control for hardware accessory for testing.
 
 %prep
 %setup -q
+cd hat-control
+%patch0001 -p1
 
 %build
 cd hat-control
