@@ -4,7 +4,7 @@ Release:        1
 Summary:        Control for hardware accessory for testing
 Group:          Hardware/Other
 License:        LGPL
-URL:            http://wiki.meego.com/Quality/QA-tools/hat-control
+URL:            http://www.optofidelity.com/products-and-services/test-automation/hat-hardware-accessory-for-testing
 Source0:        %{name}-%{version}.tar.gz
 BuildRequires:  libusb1-devel
 BuildRequires:  glib2-devel
