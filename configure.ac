@@ -1,6 +1,7 @@
 AC_INIT([hatcontrol], [0.1.0])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
-AC_PROG_CC
+AM_PROG_CC_C_O
+m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 LT_INIT
 AC_CONFIG_FILES([
 	Makefile
