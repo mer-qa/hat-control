@@ -43,13 +43,13 @@ rm -rf %{buildroot}
 
 %files
 %defattr(-,root,root)
-%doc hat-control/COPYING
+%doc COPYING
 %{_bindir}/*
 /usr/lib/*.so.*
 
 %files devel
 %defattr(-,root,root)
-%doc hat-control/INSTALL
+%doc INSTALL
 %{_includedir}/*
 /usr/lib/pkgconfig/*
 /usr/lib/*.so
