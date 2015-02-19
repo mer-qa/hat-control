@@ -8,6 +8,6 @@ AC_CONFIG_FILES([
 	libhatcontrol.pc
 	])
 PKG_CHECK_MODULES([DEPS], [
- glib-2.0 >= 2.24.1
+ glib-2.0 >= 2.22.1
 ])
 AC_OUTPUT
