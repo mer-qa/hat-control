@@ -1,0 +1,22 @@
+<html>
+<head>
+	<title>OptoFidelity HAT Control</title>
+</head>
+<body>
+	<p>
+		Executed command-line:<br>
+		${response}
+	</p>
+	<form method="get" action="hat-control.wsgi">
+
+		<input name="-usb1pwr" type="checkbox" value="on" checked="-usb1pwr">USB 1 Vcc</input><br>
+		<input name="-usb1data" type="checkbox" value="on" checked="-usb1data">USB 1 data</input><br>
+		<input name="-usb2pwr" type="checkbox" value="on" checked="-usb2pwr">USB 2 Vcc</input><br>      
+		<input name="-usb2data" type="checkbox" value="on" checked="-usb2data">USB 2 data</input><br>
+		<input name="-pwr1" type="checkbox" value="on" checked="-pwr1">Power 1</input><br>
+		<input name="-pwr2" type="checkbox" value="on" checked="-pwr2">Power 2</input><br>
+
+		<input type="submit" value="Submit">
+      </form>
+   </body>
+</html>

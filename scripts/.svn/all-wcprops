@@ -1,0 +1,41 @@
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/design/!svn/ver/5345/design/NOK1501_Zwang_sensor_interface/Software/trunk/scripts
+END
+pygraph.py
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/svn/design/!svn/ver/5510/design/NOK1501_Zwang_sensor_interface/Software/trunk/scripts/pygraph.py
+END
+rgb.py
+K 25
+svn:wc:ra_dav:version-url
+V 93
+/svn/design/!svn/ver/5534/design/NOK1501_Zwang_sensor_interface/Software/trunk/scripts/rgb.py
+END
+pulse.wav
+K 25
+svn:wc:ra_dav:version-url
+V 96
+/svn/design/!svn/ver/5345/design/NOK1501_Zwang_sensor_interface/Software/trunk/scripts/pulse.wav
+END
+audiolat.sh
+K 25
+svn:wc:ra_dav:version-url
+V 98
+/svn/design/!svn/ver/5403/design/NOK1501_Zwang_sensor_interface/Software/trunk/scripts/audiolat.sh
+END
+HatPy.py
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/svn/design/!svn/ver/5510/design/NOK1501_Zwang_sensor_interface/Software/trunk/scripts/HatPy.py
+END
+HatPy_2.py
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/svn/design/!svn/ver/5419/design/NOK1501_Zwang_sensor_interface/Software/trunk/scripts/HatPy_2.py
+END

@@ -1,0 +1,12 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: @PACKAGE@
+Description: C library for controlling HAT device
+Version: @VERSION@
+URL: http://wiki.meego.com/Quality/QA-tools/hat-control
+Requires: 
+Libs: -L${libdir} -lhatcontrol
+Cflags: -I${includedir}

@@ -1,0 +1,87 @@
+OF-HAT SW Installation Intructions
+**********************************
+
+These instuctions work in Ubuntu 10.04 distribution.
+
+HAT SW dependences:
+
+* libusb-1.0.8
+* liblabjackusb
+* glib-2.0
+
+Libusb installation:
+
+1. Install libusb-1.0.x package:
+
+   sudo apt-get install libusb-1.0
+
+glib-2.0 installation: 
+
+1. Install glib-2.0 package: 
+
+   sudo apt-get install libglib2.0-dev
+
+Liblabjackusb installation:
+
+1. Get exodriver sources:
+
+   git clone https://github.com/labjack/exodriver.git
+
+2. Go liblabjackusb folder 
+
+   $ cd exodriver/liblabjackusb
+
+3. Build library 
+
+   $ make
+
+4. Install library
+
+   $ sudo make install
+
+5. Liblabjackusb needs access to the /dev/bus/usb. Run following commands in
+   labjack-exodriver root folder.
+
+   $ cd ..
+   $ sudo cp 10-labjack.rules /etc/udev/rules.d
+   $ sudo udevadm control --reload-rules
+ 
+  
+Building HAT SW
+
+   1. Building requires autoconf, automake, libtool and pkg-config
+   2. In top level directory execute the following:
+
+   $ autoreconf -i
+   $ ./configure --prefix=/usr
+   $ make
+   $ sudo make install
+
+   3. hat_drv and hat_ctrl have been installed in /usr/bin
+
+Using HAT SW to control usb and power switches.
+
+   1. Connect HAT device to USB port and start HAT driver.
+   
+   $ hat_drv &
+
+   Driver should print 'hat_drv: HAT driver started succesfully', if it has started succesfully.
+   
+   2. Use hat_ctrl SW to control HAT device. For example switch power output 1 on
+
+   $ hat_ctrl -pwr1=on
+
+   Get all parameters just type
+
+   $ hat_ctrl
+
+Using HAT SW and different sensors
+
+   TBD...
+
+Building a binary using hatcontrol library
+
+   1. Use e.g. #include <hatcontrol/shmemlib.h> in your code
+   2. Building example using pkg-config:
+
+   $ gcc -Wall $(pkg-config --libs --cflags libhatcontrol) myhatsw.c
